@@ -1,0 +1,27 @@
+data:
+  root: data/SOCOFing
+  graph_dir: data/graphs
+  k_neighbors: 5          # k-NN edges per minutia node
+  node_feat_dim: 4        # x, y, angle, type(ending/bifurcation)
+
+model:
+  hidden_dim: 64
+  embedding_dim: 128
+  num_gcn_layers: 3
+  dropout: 0.3
+
+train:
+  batch_size: 32
+  epochs: 50
+  lr: 0.001
+  weight_decay: 0.0005
+  margin: 1.0             # triplet loss margin
+  loss: triplet           # triplet | contrastive
+  val_split: 0.15
+  test_split: 0.15
+  seed: 42
+  checkpoint_dir: models/
+
+match:
+  similarity: cosine      # cosine | euclidean
+  top_k: 5
