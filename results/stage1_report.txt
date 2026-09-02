@@ -1,0 +1,49 @@
+{
+  "identities_organized": 6000,
+  "identities_with_graphs": 6000,
+  "identities_ge2_samples": 6000,
+  "images_total": 55270,
+  "graphs_total": 55270,
+  "extraction_failures": 0,
+  "extraction_failure_rate_pct": 0.0,
+  "images_per_identity": {
+    "min": 3.0,
+    "p25": 9.0,
+    "median": 10.0,
+    "mean": 9.21,
+    "p75": 10.0,
+    "max": 10.0
+  },
+  "graphs_per_identity": {
+    "min": 3.0,
+    "p25": 9.0,
+    "median": 10.0,
+    "mean": 9.21,
+    "p75": 10.0,
+    "max": 10.0
+  },
+  "nodes_per_graph": {
+    "min": 6.0,
+    "p25": 26.0,
+    "median": 32.0,
+    "mean": 32.32,
+    "p75": 39.0,
+    "max": 76.0
+  },
+  "edges_per_graph": {
+    "min": 30.0,
+    "p25": 158.0,
+    "median": 198.0,
+    "mean": 199.16,
+    "p75": 238.0,
+    "max": 462.0
+  },
+  "sampled_graphs_checked": 2000,
+  "splits": {
+    "train": 4200,
+    "val": 900,
+    "test": 900
+  }
+}
+
+Full report -> results/stage1_report.json

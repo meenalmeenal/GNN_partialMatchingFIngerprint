@@ -66,5 +66,14 @@ python src/match.py --partial path/to/partial.png --gallery data/graphs
 Run scripts from the repo root; each entry point adds `src/` to `sys.path` itself.
 
 ## Status
-🚧 Work in progress. Pipeline is wired end-to-end and passes `smoke_test.py`.
-Next: download SOCOFing, build real graphs, train, and record Rank-1 / EER.
+🚧 Work in progress.
+
+- **Stage 1 (data pipeline) — done.** SOCOFing organized into 6,000 finger identities;
+  55,270 minutiae graphs built (0 failures); train/val/test split by finger
+  (4,200 / 900 / 900) in `models/splits.json`. Report: `results/stage1_report.json`.
+- **Stage 1.5 (extraction quality) — done.** Rewrote the classical minutiae extractor
+  (segmentation mask, gradient orientation field, orientation-selective Gabor, spur
+  pruning). Minutiae/print: median 32 (was ~198). See `src/tune_extraction.py` and
+  `results/extraction_preview.png`.
+- **Next:** Stage 2 — evaluation harness that respects the split (ROC/EER plots),
+  then Stage 3 — first training run.

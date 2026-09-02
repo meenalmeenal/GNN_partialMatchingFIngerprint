@@ -64,7 +64,19 @@ def minutiae_to_graph(minutiae: list[Minutia], k: int = 5, img_size=(256, 256)) 
     return Data(x=x, edge_index=edge_index, edge_attr=edge_attr, num_nodes=len(minutiae))
 
 
-def build_graph_dataset(input_dir: str, output_dir: str, k: int = 5):
+def _build_one(args):
+    path, rel, out_path, k = args
+    try:
+        minutiae = minutiae_from_image(path)
+        graph = minutiae_to_graph(minutiae, k=k)
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        torch.save(graph, out_path)
+        return rel, len(minutiae), None
+    except Exception as e:
+        return rel, None, str(e)
+
+
+def build_graph_dataset(input_dir: str, output_dir: str, k: int = 5, workers: int = 1):
     """
     Expects input_dir laid out as: input_dir/<subject_id>/<image>.png (SOCOFing-style).
     Saves one .pt file per image to output_dir/<subject_id>/<image>.pt
@@ -73,21 +85,52 @@ def build_graph_dataset(input_dir: str, output_dir: str, k: int = 5):
     image_paths = glob.glob(os.path.join(input_dir, "**", "*.*"), recursive=True)
     image_paths = [p for p in image_paths if p.lower().endswith((".png", ".bmp", ".jpg", ".tif"))]
 
-    ok, failed = 0, 0
+    tasks = []
     for path in image_paths:
         rel = os.path.relpath(path, input_dir)
         out_path = os.path.join(output_dir, os.path.splitext(rel)[0] + ".pt")
-        os.makedirs(os.path.dirname(out_path), exist_ok=True)
-        try:
-            minutiae = minutiae_from_image(path)
-            graph = minutiae_to_graph(minutiae, k=k)
-            torch.save(graph, out_path)
-            ok += 1
-        except Exception as e:
-            print(f"[skip] {path}: {e}")
-            failed += 1
+        tasks.append((path, rel, out_path, k))
 
-    print(f"Done. {ok} graphs built, {failed} failed.")
+    ok, failed = 0, 0
+    failures, minutiae_counts = [], {}
+
+    if workers and workers > 1:
+        import multiprocessing as mp
+        with mp.Pool(workers) as pool:
+            for i, (rel, n, err) in enumerate(pool.imap_unordered(_build_one, tasks, chunksize=16)):
+                if err is None:
+                    minutiae_counts[rel] = n
+                    ok += 1
+                else:
+                    failures.append({"path": rel, "error": err})
+                    failed += 1
+                if (i + 1) % 2000 == 0:
+                    print(f"  {i + 1}/{len(tasks)} processed ({ok} ok, {failed} failed)")
+    else:
+        for i, t in enumerate(tasks):
+            rel, n, err = _build_one(t)
+            if err is None:
+                minutiae_counts[rel] = n
+                ok += 1
+            else:
+                print(f"[skip] {rel}: {err}")
+                failures.append({"path": rel, "error": err})
+                failed += 1
+            if (i + 1) % 500 == 0:
+                print(f"  {i + 1}/{len(tasks)} processed ({ok} ok, {failed} failed)")
+
+    log = {
+        "input_dir": input_dir, "k": k,
+        "images": len(image_paths), "ok": ok, "failed": failed,
+        "failure_rate_pct": round(100 * failed / len(image_paths), 2) if image_paths else None,
+        "failures": failures,
+        "minutiae_counts": minutiae_counts,
+    }
+    import json
+    with open(os.path.join(output_dir, "_build_log.json"), "w") as f:
+        json.dump(log, f, indent=2)
+
+    print(f"Done. {ok} graphs built, {failed} failed. Log -> {os.path.join(output_dir, '_build_log.json')}")
 
 
 if __name__ == "__main__":
@@ -95,5 +138,7 @@ if __name__ == "__main__":
     parser.add_argument("--input", required=True, help="Root dir of raw fingerprint images")
     parser.add_argument("--output", required=True, help="Where to save .pt graph files")
     parser.add_argument("--k", type=int, default=5, help="k for k-NN graph construction")
+    parser.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 1),
+                        help="parallel worker processes")
     args = parser.parse_args()
-    build_graph_dataset(args.input, args.output, k=args.k)
+    build_graph_dataset(args.input, args.output, k=args.k, workers=args.workers)
