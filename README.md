@@ -45,10 +45,26 @@ pip install torch torchvision torch-geometric opencv-python scikit-image scikit-
 
 ## Quick start
 ```bash
-python src/graph_build.py --input data/SOCOFing --output data/graphs
+# 0. sanity-check the whole pipeline on synthetic data (no dataset needed)
+python src/smoke_test.py
+
+# 1. organize raw SOCOFing into an <identity>/<sample> image tree
+python src/prepare_socofing.py --input data/SOCOFing --output data/SOCOFing_organized --link
+
+# 2. images -> k-NN minutiae graphs
+python src/graph_build.py --input data/SOCOFing_organized --output data/graphs
+
+# 3. train (writes models/best_model.pt + models/splits.json)
 python src/train.py --config configs/default.yaml
-python src/match.py --partial path/to/partial.png --gallery data/graphs/gallery
+
+# 4. evaluate on the held-out test subjects
+python src/evaluate.py --gallery data/graphs --test data/graphs
+
+# 5. match a single partial print
+python src/match.py --partial path/to/partial.png --gallery data/graphs
 ```
+Run scripts from the repo root; each entry point adds `src/` to `sys.path` itself.
 
 ## Status
-🚧 Work in progress — scaffold stage.
+🚧 Work in progress. Pipeline is wired end-to-end and passes `smoke_test.py`.
+Next: download SOCOFing, build real graphs, train, and record Rank-1 / EER.

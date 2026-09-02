@@ -5,7 +5,11 @@ Evaluate the trained model on a held-out test split:
 """
 import argparse
 import os
+import sys
 import glob
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import numpy as np
 import torch
 from sklearn.metrics import roc_curve
