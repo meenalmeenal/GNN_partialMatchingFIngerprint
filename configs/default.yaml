@@ -2,7 +2,7 @@ data:
   root: data/SOCOFing
   graph_dir: data/graphs
   k_neighbors: 5          # k-NN edges per minutia node
-  node_feat_dim: 4        # x, y, angle, type(ending/bifurcation)
+  node_feat_dim: 5        # x_norm, y_norm, sin(angle), cos(angle), type
 
 model:
   hidden_dim: 64

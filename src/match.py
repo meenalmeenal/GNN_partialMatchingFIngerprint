@@ -4,7 +4,11 @@ gallery of pre-embedded full-print graphs (cosine similarity ranking).
 """
 import argparse
 import os
+import sys
 import glob
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import torch
 import yaml
 from torch_geometric.data import Batch

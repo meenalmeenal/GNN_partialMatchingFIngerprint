@@ -7,7 +7,11 @@ Edge features: [distance, relative_angle] (optional, used by edge-conditioned GC
 """
 import argparse
 import os
+import sys
 import glob
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import numpy as np
 import torch
 from torch_geometric.data import Data
@@ -46,11 +50,12 @@ def minutiae_to_graph(minutiae: list[Minutia], k: int = 5, img_size=(256, 256)) 
             edge_set.add((i, int(j)))
             edge_set.add((int(j), i))
 
-    edge_index = torch.tensor(list(edge_set), dtype=torch.long).t().contiguous()
+    edges = sorted(edge_set)
+    edge_index = torch.tensor(edges, dtype=torch.long).t().contiguous()
 
     # Edge attributes: normalized distance + relative angle
     edge_attr = []
-    for i, j in edge_set:
+    for i, j in edges:
         dist = np.linalg.norm(coords[i] - coords[j]) / np.sqrt(w ** 2 + h ** 2)
         rel_angle = minutiae[i].angle - minutiae[j].angle
         edge_attr.append([dist, np.sin(rel_angle), np.cos(rel_angle)])
