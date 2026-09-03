@@ -75,5 +75,9 @@ Run scripts from the repo root; each entry point adds `src/` to `sys.path` itsel
   (segmentation mask, gradient orientation field, orientation-selective Gabor, spur
   pruning). Minutiae/print: median 32 (was ~198). See `src/tune_extraction.py` and
   `results/extraction_preview.png`.
-- **Next:** Stage 2 — evaluation harness that respects the split (ROC/EER plots),
-  then Stage 3 — first training run.
+- **Stage 2 (evaluation harness) — done.** `src/evaluate.py` now scores only the
+  held-out test fingers, gallery = clean `Real` print, probes = altered prints.
+  Reports Rank-1/5 + CMC, EER + ROC AUC, per-alteration breakdown, with plots.
+  Untrained-model baseline (the floor to beat): Rank-1 9.7 %, EER 27.5 %
+  (`results/stage2_notes.md`, `results/untrained_baseline/`).
+- **Next:** Stage 3 — first training run.

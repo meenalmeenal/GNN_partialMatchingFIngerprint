@@ -6,6 +6,7 @@ loop, gallery matching and evaluation all run and wire together correctly.
 
     python src/smoke_test.py
 """
+import json
 import os
 import sys
 import tempfile
@@ -21,7 +22,8 @@ from graph_build import minutiae_to_graph
 from dataset import FingerprintTripletDataset, triplet_collate, split_subjects
 from train import train
 from match import load_model, build_gallery, rank_matches, embed_graph_file
-from evaluate import evaluate_rank1, evaluate_verification
+from evaluate import (collect as ev_collect, embed_paths as ev_embed,
+                      identification as ev_identification, verification as ev_verification)
 
 
 def synth_minutiae(rng, n, jitter=0.0, drop=0.0):
@@ -82,9 +84,18 @@ def main():
     assert top and len(top[0]) == 2
     print(f"[4/5] gallery match ran, top-1 = {top[0]}")
 
-    r1 = evaluate_rank1(model, graph_dir, gallery, device)
-    eer, thr = evaluate_verification(model, graph_dir, device)
-    print(f"[5/5] evaluate ran: rank-1={r1*100:.1f}%  EER={eer*100:.1f}%  thr={thr:.3f}")
+    splits = json.load(open(os.path.join(tmp, "models", "splits.json")))
+    test_fingers = splits["test"] or splits["val"] or splits["train"]
+    gal, probes = ev_collect(graph_dir, test_fingers)
+    gfl = list(gal)
+    fidx = {f: i for i, f in enumerate(gfl)}
+    ge = ev_embed(model, [gal[f] for f in gfl], device)
+    gf = torch.tensor([fidx[f] for f in gfl])
+    pe = ev_embed(model, [p for p, _, _ in probes], device)
+    pf = torch.tensor([fidx[f] for _, f, _ in probes])
+    ident = ev_identification(pe, pf, ge, gf)
+    ver, _ = ev_verification(pe, pf, ge, gf)
+    print(f"[5/5] evaluate ran: rank-1={ident['rank1']*100:.1f}%  EER={ver['eer']*100:.1f}%")
 
     print("\nSMOKE TEST PASSED")
 
