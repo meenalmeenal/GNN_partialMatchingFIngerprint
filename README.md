@@ -92,4 +92,10 @@ Run scripts from the repo root; each entry point adds `src/` to `sys.path` itsel
   inter-identity similarity (p90 0.885) and Rank-1 losses are mostly near-misses
   (35.7% within 0.02 of flipping) — a separation/margin problem, fixable with
   hard-negative mining. See `results/stage4_notes.md`.
-- **Next:** Stage 5 — classical baseline matcher.
+- **Stage 5 (classical baseline) — done.** `src/classical_match.py`: generalized
+  Hough alignment on the same minutiae graphs, rotation+translation invariant.
+  Head-to-head on 200 test fingers: **Rank-1 89.3 % vs GNN's 10.8 %**, EER 5.9 % vs
+  18.0 %. Classical wins decisively — isolates what the GNN lacks (rotation
+  invariance, precise local correspondence vs. global pooling). See
+  `results/stage5_notes.md`.
+- **Next:** Stage 6 — partiality sweep (GNN vs classical as overlap shrinks).
