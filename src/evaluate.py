@@ -49,9 +49,21 @@ def build_untrained_model(config_path, device):
     return model, cfg
 
 
-def collect(graph_dir, fingers):
-    """-> gallery {finger: path}, probes [(path, finger, tag)]"""
+def collect(graph_dir, fingers, packed=None):
+    """-> gallery {finger: Data|path}, probes [(Data|path, finger, tag)]"""
     gallery, probes = {}, []
+    if packed is not None:
+        data = packed if isinstance(packed, dict) else torch.load(packed, weights_only=False)
+        for f in fingers:
+            tagmap = data.get(f)
+            if not tagmap or len(tagmap) < 2:
+                continue
+            gtag = GALLERY_TAG if GALLERY_TAG in tagmap else sorted(tagmap)[0]
+            gallery[f] = tagmap[gtag]
+            for t, g in tagmap.items():
+                if t != gtag:
+                    probes.append((g, f, t))
+        return gallery, probes
     for f in fingers:
         d = os.path.join(graph_dir, f)
         if not os.path.isdir(d):
@@ -71,10 +83,12 @@ def collect(graph_dir, fingers):
 
 
 @torch.no_grad()
-def embed_paths(model, paths, device, batch_size=256):
+def embed_paths(model, items, device, batch_size=256):
+    """items: list of Data objects or list of .pt paths."""
     out = []
-    for i in range(0, len(paths), batch_size):
-        chunk = [torch.load(p, weights_only=False) for p in paths[i:i + batch_size]]
+    for i in range(0, len(items), batch_size):
+        chunk = [x if not isinstance(x, str) else torch.load(x, weights_only=False)
+                 for x in items[i:i + batch_size]]
         batch = Batch.from_data_list(chunk).to(device)
         out.append(model.embed(batch).cpu())
     return torch.cat(out, 0) if out else torch.empty(0)
@@ -165,6 +179,8 @@ def main():
     ap.add_argument("--config", default="configs/default.yaml")
     ap.add_argument("--splits", default="models/splits.json")
     ap.add_argument("--graph_dir", default=None)
+    ap.add_argument("--packed", default="data/packed/test.pt",
+                    help="packed test graphs; falls back to per-file graph_dir if missing")
     ap.add_argument("--outdir", default="results")
     ap.add_argument("--limit", type=int, default=0, help="cap #test fingers (debug)")
     args = ap.parse_args()
@@ -181,7 +197,9 @@ def main():
     if args.limit:
         fingers = fingers[:args.limit]
 
-    gallery, probes = collect(graph_dir, fingers)
+    packed = args.packed if (args.packed and os.path.exists(args.packed)) else None
+    gallery, probes = collect(graph_dir, fingers, packed=packed)
+    print(f"source: {'packed ' + args.packed if packed else 'per-file ' + graph_dir}")
     print(f"test fingers={len(fingers)}  gallery templates={len(gallery)}  probes={len(probes)}")
 
     gf_list = list(gallery.keys())

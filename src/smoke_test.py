@@ -68,11 +68,11 @@ def main():
 
     cfg = yaml.safe_load(open(os.path.join(os.path.dirname(__file__), "..", "configs", "default.yaml")))
     cfg["data"]["graph_dir"] = graph_dir
-    cfg["train"].update(epochs=2, batch_size=8, checkpoint_dir=os.path.join(tmp, "models"))
-    cfg_path = os.path.join(tmp, "smoke.yaml")
-    yaml.safe_dump(cfg, open(cfg_path, "w"))
-
-    train(cfg_path)
+    cfg["data"]["packed_dir"] = os.path.join(tmp, "nopack")   # force per-file path
+    cfg["train"].update(epochs=2, batch_size=8, iters_per_epoch=5, val_iters=3,
+                        checkpoint_dir=os.path.join(tmp, "models"))
+    os.chdir(tmp)                                             # results/<tag>/ lands in tmp
+    train(cfg, tag="smoke")
     print("[3/5] training loop completed, checkpoint written")
 
     device = torch.device("cpu")

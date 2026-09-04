@@ -80,4 +80,10 @@ Run scripts from the repo root; each entry point adds `src/` to `sys.path` itsel
   Reports Rank-1/5 + CMC, EER + ROC AUC, per-alteration breakdown, with plots.
   Untrained-model baseline (the floor to beat): Rank-1 9.7 %, EER 27.5 %
   (`results/stage2_notes.md`, `results/untrained_baseline/`).
-- **Next:** Stage 3 — first training run.
+- **Stage 3 (first training run) — done.** 3-layer GCN + triplet loss (random
+  negatives), early-stopped at epoch 25. Test set vs untrained baseline:
+  EER 27.5 % → **17.1 %**, ROC AUC 0.805 → **0.903** (verification improved);
+  Rank-1 9.7 % → 3.8 % (identification regressed — random-negative loss + pooling
+  smooths the same-impression positional signal). See `results/stage3_notes.md`.
+  Fast in-RAM training via `src/pack_graphs.py` (2.5 s/step → 39 ms/step).
+- **Next:** Stage 4 — embedding diagnostics.

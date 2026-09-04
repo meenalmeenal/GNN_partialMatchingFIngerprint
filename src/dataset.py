@@ -1,68 +1,89 @@
 """
 PyG Dataset that samples (anchor, positive, negative) graph triplets.
 
-Assumes graph files are laid out as:
-  graph_dir/<subject_id>/<sample>.pt
-so that all files under the same subject_id are "same finger" (positives),
-and files under any other subject_id are negatives.
+Two data sources:
+  - graph_dir: root laid out as graph_dir/<finger_id>/<sample>.pt  (loads per file)
+  - packed:    a dict {finger_id: {tag: Data}} or a path to one (from pack_graphs.py);
+               everything is held in RAM -> no per-step disk I/O.
+
+Samples under the same finger_id are "same finger" (positives); any other finger
+is a negative.
 """
+import glob
 import os
 import random
-import glob
+
 import torch
 from torch.utils.data import Dataset
 from torch_geometric.data import Batch
 
 
+def load_packed(packed):
+    """Accept a dict or a path; return the {finger: {tag: Data}} dict."""
+    if isinstance(packed, str):
+        return torch.load(packed, weights_only=False)
+    return packed
+
+
 class FingerprintTripletDataset(Dataset):
-    def __init__(self, graph_dir: str, seed: int = 42, subjects: list | None = None):
-        """
-        graph_dir: root laid out as graph_dir/<subject_id>/<sample>.pt
-        subjects:  optional whitelist of subject_ids to include (used for train/val/test splits).
-        """
-        self.graph_dir = graph_dir
-        self.subjects = {}  # subject_id -> list of .pt paths
-        allowed = set(subjects) if subjects is not None else None
-        for subj in sorted(os.listdir(graph_dir)):
-            if allowed is not None and subj not in allowed:
-                continue
-            subj_path = os.path.join(graph_dir, subj)
-            if not os.path.isdir(subj_path):
-                continue
-            files = glob.glob(os.path.join(subj_path, "*.pt"))
-            if len(files) >= 2:  # need at least 2 samples for a positive pair
-                self.subjects[subj] = files
-        self.subject_ids = list(self.subjects.keys())
-        if len(self.subject_ids) < 2:
-            raise ValueError(
-                f"Need >=2 subjects with >=2 samples each in {graph_dir}; found {len(self.subject_ids)}"
-            )
+    def __init__(self, graph_dir: str = None, seed: int = 42, subjects: list | None = None,
+                 packed=None, epoch_size: int | None = None):
         self._rng = random.Random(seed)
+        self.epoch_size = epoch_size
+        self._cache = {}          # key -> Data (for the file-based path)
+        self.samples = {}         # finger_id -> list of (key, Data-or-None)
+
+        if packed is not None:
+            data = load_packed(packed)
+            allowed = set(subjects) if subjects is not None else None
+            for fid, tagmap in data.items():
+                if allowed is not None and fid not in allowed:
+                    continue
+                if len(tagmap) >= 2:
+                    self.samples[fid] = [(f"{fid}/{t}", g) for t, g in tagmap.items()]
+        else:
+            allowed = set(subjects) if subjects is not None else None
+            for fid in sorted(os.listdir(graph_dir)):
+                if allowed is not None and fid not in allowed:
+                    continue
+                d = os.path.join(graph_dir, fid)
+                if not os.path.isdir(d):
+                    continue
+                files = glob.glob(os.path.join(d, "*.pt"))
+                if len(files) >= 2:
+                    self.samples[fid] = [(p, None) for p in files]
+
+        self.finger_ids = list(self.samples)
+        if len(self.finger_ids) < 2:
+            raise ValueError(f"Need >=2 fingers with >=2 samples; found {len(self.finger_ids)}")
+
+    def _get(self, key, graph):
+        if graph is not None:
+            return graph
+        if key not in self._cache:
+            self._cache[key] = torch.load(key, weights_only=False)
+        return self._cache[key]
 
     def __len__(self):
-        return sum(len(v) for v in self.subjects.values())
+        return self.epoch_size or sum(len(v) for v in self.samples.values())
 
     def __getitem__(self, idx):
-        subj = self._rng.choice(self.subject_ids)
-        files = self.subjects[subj]
-        anchor_path, pos_path = self._rng.sample(files, 2)
-
-        neg_subj = self._rng.choice([s for s in self.subject_ids if s != subj])
-        neg_path = self._rng.choice(self.subjects[neg_subj])
-
-        anchor = torch.load(anchor_path, weights_only=False)
-        pos = torch.load(pos_path, weights_only=False)
-        neg = torch.load(neg_path, weights_only=False)
-        return anchor, pos, neg
+        fid = self._rng.choice(self.finger_ids)
+        (ak, ag), (pk, pg) = self._rng.sample(self.samples[fid], 2)
+        neg_fid = self._rng.choice(self.finger_ids)
+        while neg_fid == fid:
+            neg_fid = self._rng.choice(self.finger_ids)
+        nk, ng = self._rng.choice(self.samples[neg_fid])
+        return self._get(ak, ag), self._get(pk, pg), self._get(nk, ng)
 
 
 def triplet_collate(batch):
-    anchors, positives, negatives = zip(*batch)
-    return Batch.from_data_list(anchors), Batch.from_data_list(positives), Batch.from_data_list(negatives)
+    a, p, n = zip(*batch)
+    return Batch.from_data_list(a), Batch.from_data_list(p), Batch.from_data_list(n)
 
 
 def split_subjects(graph_dir: str, val_split: float, test_split: float, seed: int = 42):
-    """Partition subject_ids (disjoint) into train/val/test lists."""
+    """Partition finger ids (disjoint) into train/val/test lists."""
     subs = sorted(
         s for s in os.listdir(graph_dir)
         if os.path.isdir(os.path.join(graph_dir, s))
@@ -72,7 +93,4 @@ def split_subjects(graph_dir: str, val_split: float, test_split: float, seed: in
     n = len(subs)
     n_test = int(round(n * test_split))
     n_val = int(round(n * val_split))
-    test = subs[:n_test]
-    val = subs[n_test:n_test + n_val]
-    train = subs[n_test + n_val:]
-    return train, val, test
+    return subs[n_test + n_val:], subs[n_test:n_test + n_val], subs[:n_test]
