@@ -86,4 +86,10 @@ Run scripts from the repo root; each entry point adds `src/` to `sys.path` itsel
   Rank-1 9.7 % → 3.8 % (identification regressed — random-negative loss + pooling
   smooths the same-impression positional signal). See `results/stage3_notes.md`.
   Fast in-RAM training via `src/pack_graphs.py` (2.5 s/step → 39 ms/step).
-- **Next:** Stage 4 — embedding diagnostics.
+- **Stage 4 (embedding diagnostics) — done.** `src/diagnostics.py` +
+  `notebooks/01_diagnostics.ipynb`. Same-finger embeddings cluster (t-SNE) and genuine
+  scores are strong (0.89→0.83 Easy→Hard), but gallery templates have a heavy-tailed
+  inter-identity similarity (p90 0.885) and Rank-1 losses are mostly near-misses
+  (35.7% within 0.02 of flipping) — a separation/margin problem, fixable with
+  hard-negative mining. See `results/stage4_notes.md`.
+- **Next:** Stage 5 — classical baseline matcher.
