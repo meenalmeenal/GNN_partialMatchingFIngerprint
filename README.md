@@ -66,5 +66,36 @@ python src/match.py --partial path/to/partial.png --gallery data/graphs
 Run scripts from the repo root; each entry point adds `src/` to `sys.path` itself.
 
 ## Status
-🚧 Work in progress. Pipeline is wired end-to-end and passes `smoke_test.py`.
-Next: download SOCOFing, build real graphs, train, and record Rank-1 / EER.
+🚧 Work in progress.
+
+- **Stage 1 (data pipeline) — done.** SOCOFing organized into 6,000 finger identities;
+  55,270 minutiae graphs built (0 failures); train/val/test split by finger
+  (4,200 / 900 / 900) in `models/splits.json`. Report: `results/stage1_report.json`.
+- **Stage 1.5 (extraction quality) — done.** Rewrote the classical minutiae extractor
+  (segmentation mask, gradient orientation field, orientation-selective Gabor, spur
+  pruning). Minutiae/print: median 32 (was ~198). See `src/tune_extraction.py` and
+  `results/extraction_preview.png`.
+- **Stage 2 (evaluation harness) — done.** `src/evaluate.py` now scores only the
+  held-out test fingers, gallery = clean `Real` print, probes = altered prints.
+  Reports Rank-1/5 + CMC, EER + ROC AUC, per-alteration breakdown, with plots.
+  Untrained-model baseline (the floor to beat): Rank-1 9.7 %, EER 27.5 %
+  (`results/stage2_notes.md`, `results/untrained_baseline/`).
+- **Stage 3 (first training run) — done.** 3-layer GCN + triplet loss (random
+  negatives), early-stopped at epoch 25. Test set vs untrained baseline:
+  EER 27.5 % → **17.1 %**, ROC AUC 0.805 → **0.903** (verification improved);
+  Rank-1 9.7 % → 3.8 % (identification regressed — random-negative loss + pooling
+  smooths the same-impression positional signal). See `results/stage3_notes.md`.
+  Fast in-RAM training via `src/pack_graphs.py` (2.5 s/step → 39 ms/step).
+- **Stage 4 (embedding diagnostics) — done.** `src/diagnostics.py` +
+  `notebooks/01_diagnostics.ipynb`. Same-finger embeddings cluster (t-SNE) and genuine
+  scores are strong (0.89→0.83 Easy→Hard), but gallery templates have a heavy-tailed
+  inter-identity similarity (p90 0.885) and Rank-1 losses are mostly near-misses
+  (35.7% within 0.02 of flipping) — a separation/margin problem, fixable with
+  hard-negative mining. See `results/stage4_notes.md`.
+- **Stage 5 (classical baseline) — done.** `src/classical_match.py`: generalized
+  Hough alignment on the same minutiae graphs, rotation+translation invariant.
+  Head-to-head on 200 test fingers: **Rank-1 89.3 % vs GNN's 10.8 %**, EER 5.9 % vs
+  18.0 %. Classical wins decisively — isolates what the GNN lacks (rotation
+  invariance, precise local correspondence vs. global pooling). See
+  `results/stage5_notes.md`.
+- **Next:** Stage 6 — partiality sweep (GNN vs classical as overlap shrinks).

@@ -1,6 +1,7 @@
 data:
   root: data/SOCOFing
   graph_dir: data/graphs
+  packed_dir: data/packed # consolidated per-split graph files (pack_graphs.py)
   k_neighbors: 5          # k-NN edges per minutia node
   node_feat_dim: 5        # x_norm, y_norm, sin(angle), cos(angle), type
 
@@ -13,6 +14,9 @@ model:
 train:
   batch_size: 32
   epochs: 50
+  iters_per_epoch: 400    # random triplet batches per epoch (sampling is stochastic)
+  val_iters: 60           # fixed val triplet batches for the loss curve
+  patience: 8             # early-stop after N epochs without val improvement
   lr: 0.001
   weight_decay: 0.0005
   margin: 1.0             # triplet loss margin

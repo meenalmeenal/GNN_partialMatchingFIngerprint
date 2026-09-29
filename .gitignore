@@ -5,3 +5,4 @@ models/*.pt
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+results/*_train.log
