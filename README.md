@@ -110,5 +110,14 @@ Run scripts from the repo root; each entry point adds `src/` to `sys.path` itsel
   area). So the collapse is **not** mainly a training-distribution problem; the global
   embedding (absolute coordinates + mean/max pooling) is the limit. See
   `results/stage6b_notes.md`.
-- **Next:** Stage 7 — interactive matching interface; then Stage 9 (architecture changes:
-  relative/rotation-invariant features, correspondence-style matching, hard negatives).
+- **Stage 9 (model improvements) — done, main result of the project so far.** Ablation of
+  loss / invariant features / readout. A correspondence-style matcher (relative-geometry GNN,
+  per-minutia descriptors, MaxSim scoring, in-batch InfoNCE) reaches Rank-1 78.1 / 59.7 / 50.4 /
+  38.0 / 22.3 % at 100/75/50/25/10 % of the print, vs classical 89.3 / 71.1 / 46.2 / 21.0 / 5.2 %
+  (200 fingers). Classical still wins on near-complete prints; the learned model overtakes it
+  at <= 50 % area and degrades far more gracefully, so the central hypothesis is now supported.
+  Full 900-finger protocol: Rank-1 73.1 % (Stage 3: 3.8 %). Caveats: SOCOFing probes are edited
+  copies of the gallery impression (cross-dataset FVC test is the key open risk), single seeds,
+  model not fully converged. See `results/stage9_notes.md`.
+- **Next:** Stage 7 — interactive matching interface on the Stage 9 model; then Stage 8
+  (FVC cross-dataset, distortion augmentation).

@@ -23,7 +23,8 @@ import numpy as np
 import torch
 
 from evaluate import (collect, embed_paths, identification, verification,
-                      build_untrained_model)
+                      identification_sim, verification_sim, build_untrained_model)
+from model_v2 import load_matcher, score_matrix
 from match import load_model
 from graph_build import minutiae_to_graph
 from minutiae import Minutia
@@ -77,6 +78,19 @@ def gnn_metrics(model, gallery_graphs, probe_graphs, pf_idx, device):
             "eer": ver["eer"], "auc": ver["auc"]}
 
 
+def v2_metrics(model, gallery_graphs, probe_graphs, pf_idx):
+    sim = score_matrix(model, probe_graphs, gallery_graphs)
+    pf, gf = torch.tensor(pf_idx), torch.arange(len(gallery_graphs))
+    ident = identification_sim(sim, pf, gf)
+    ver, _ = verification_sim(sim, pf, gf)
+    # test-normalisation: z-score each probe's scores over the gallery, so one global
+    # threshold is meaningful across probes (does not change any ranking / Rank-k)
+    sim_n = (sim - sim.mean(1, keepdim=True)) / sim.std(1, keepdim=True).clamp_min(1e-6)
+    ver_n, _ = verification_sim(sim_n, pf, gf)
+    return {"rank1": ident["rank1"], "rank5": ident["rank5"], "eer": ver["eer"], "auc": ver["auc"],
+            "eer_tnorm": ver_n["eer"], "auc_tnorm": ver_n["auc"]}
+
+
 def make_plots(results, outdir):
     import matplotlib
     matplotlib.use("Agg")
@@ -84,13 +98,13 @@ def make_plots(results, outdir):
 
     areas = [int(l * 100) for l in LEVELS]
     first = results["levels"][str(areas[0])]
-    palette = ["#2f6ea5", "#c0562b", "#7a4aa8", "#b8860b"]
-    markers = ["s", "D", "v", "P"]
-    series = [("classical", "Classical Hough", "#2f7d5d", "o")]
+    palette = ["#2f6ea5", "#c0562b", "#7a4aa8", "#b8860b", "#d1495b", "#00798c", "#6a994e"]
+    markers = ["s", "D", "v", "P", "X", "h", "<"]
+    series = [("classical", "Classical Hough", "#2f7d5d", "o")] if "classical" in first else []
     extras = [k for k in first if k.startswith("gnn_") and k not in ("gnn_trained", "gnn_untrained")]
     series.append(("gnn_trained", "GCN (Stage 3, full prints only)", palette[0], markers[0]))
     for i, key in enumerate(extras):
-        series.append((key, "GCN (" + key[4:] + ")", palette[(i + 1) % 4], markers[(i + 1) % 4]))
+        series.append((key, key[4:], palette[(i + 1) % 7], markers[(i + 1) % 7]))
     series.append(("gnn_untrained", "GCN (untrained floor)", "#8a8f99", "^"))
     for metric, ylabel, fname, pct in [("rank1", "Rank-1 identification (%)", "sweep_rank1.png", True),
                                        ("eer", "Equal Error Rate (%)", "sweep_eer.png", True)]:
@@ -119,6 +133,10 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--models", nargs="*", default=[],
                     help="extra GCN checkpoints to score, as name=path")
+    ap.add_argument("--models-v2", nargs="*", default=[],
+                    help="Stage 9 Matcher checkpoints (model_v2), as name=path")
+    ap.add_argument("--skip-classical", action="store_true",
+                    help="omit the classical matcher (it is O(fingers^2); needed for 900 fingers)")
     ap.add_argument("--reuse-classical", default=None,
                     help="sweep_metrics.json from an earlier run: reuse its classical results "
                          "(valid because crops are deterministic for a given seed)")
@@ -132,6 +150,10 @@ def main():
     for spec in args.models:
         name, path = spec.split("=", 1)
         extra_models["gnn_" + name], _ = load_model(path, device)
+    v2_models = {}
+    for spec in args.models_v2:
+        name, path = spec.split("=", 1)
+        v2_models["gnn_" + name] = load_matcher(path, device)
     reused = json.load(open(args.reuse_classical)) if args.reuse_classical else None
     torch.manual_seed(0)  # seed BEFORE building so the untrained floor is reproducible
     untrained, _ = build_untrained_model("configs/default.yaml", device)
@@ -159,20 +181,28 @@ def main():
             for g, _, _ in probes:
                 cg, n, fell = crop_graph(g, frac, rng)
                 graphs.append(cg); counts.append(n); fb += int(fell)
-        if reused is not None:
+        if args.skip_classical:
+            cm = None
+        elif reused is not None:
             old = reused["levels"][str(int(frac * 100))]
             assert reused["n_probes"] == len(probes) and reused["seed"] == args.seed
             assert abs(old["minutiae_per_probe"]["mean"] - float(np.mean(counts))) < 1e-9, "crops differ"
             cm = old["classical"]
         else:
             probes_m = [graph_to_minutiae(g) for g in graphs]
-            cm, _ = evaluate_classical(gallery_m, probes_m, pf_idx, fids)
+            cm, cscores = evaluate_classical(gallery_m, probes_m, pf_idx, fids)
+            cs = torch.as_tensor(np.asarray(cscores), dtype=torch.float32)
+            cs = (cs - cs.mean(1, keepdim=True)) / cs.std(1, keepdim=True).clamp_min(1e-6)
+            vn, _ = verification_sim(cs, torch.tensor(pf_idx), torch.arange(len(gallery_m)))
+            cm = {**cm, "eer_tnorm": vn["eer"], "auc_tnorm": vn["auc"]}
         entry = {
-            "classical": {k: cm[k] for k in ("rank1", "rank5", "eer", "auc")},
+            **({"classical": {k: cm[k] for k in ("rank1", "rank5", "eer", "auc", "eer_tnorm", "auc_tnorm")
+                              if k in cm}} if cm else {}),
             "gnn_trained": gnn_metrics(model, gallery_graphs, graphs, pf_idx, device),
             "gnn_untrained": gnn_metrics(untrained, gallery_graphs, graphs, pf_idx, device),
             **{name: gnn_metrics(m, gallery_graphs, graphs, pf_idx, device)
                for name, m in extra_models.items()},
+            **{name: v2_metrics(m, gallery_graphs, graphs, pf_idx) for name, m in v2_models.items()},
             "minutiae_per_probe": {"mean": float(np.mean(counts)), "median": float(np.median(counts)),
                                    "min": int(np.min(counts))},
             "fallback_probes": fb,

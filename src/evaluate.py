@@ -95,7 +95,11 @@ def embed_paths(model, items, device, batch_size=256):
 
 
 def identification(pe, pf, ge, gf, max_rank=20):
-    sim = pe @ ge.t()                       # [P, G] cosine (embeddings are L2-normalised)
+    return identification_sim(pe @ ge.t(), pf, gf, max_rank)   # cosine (embeddings L2-normalised)
+
+
+def identification_sim(sim, pf, gf, max_rank=20):
+    """sim: [P, G] score matrix (any scorer); higher = better match."""
     order = sim.argsort(dim=1, descending=True)
     ranked = gf[order]                      # [P, G] finger ids in ranked order
     hits = (ranked == pf[:, None])
@@ -106,7 +110,10 @@ def identification(pe, pf, ge, gf, max_rank=20):
 
 
 def verification(pe, pf, ge, gf, seed=0):
-    sim = pe @ ge.t()
+    return verification_sim(pe @ ge.t(), pf, gf, seed)
+
+
+def verification_sim(sim, pf, gf, seed=0):
     gf_np = gf.numpy()
     pf_np = pf.numpy()
     genuine, impostor = [], []
@@ -131,7 +138,10 @@ def verification(pe, pf, ge, gf, seed=0):
 
 
 def per_tag_rank1(pe, pf, ge, gf, tags):
-    sim = pe @ ge.t()
+    return per_tag_rank1_sim(pe @ ge.t(), pf, gf, tags)
+
+
+def per_tag_rank1_sim(sim, pf, gf, tags):
     top = gf[sim.argmax(dim=1)]
     correct = (top == pf).numpy()
     out = {}

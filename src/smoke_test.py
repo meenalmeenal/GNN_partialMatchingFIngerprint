@@ -97,6 +97,31 @@ def main():
     ver, _ = ev_verification(pe, pf, ge, gf)
     print(f"[5/5] evaluate ran: rank-1={ident['rank1']*100:.1f}%  EER={ver['eer']*100:.1f}%")
 
+    # Stage 9: invariant matchers must not change under rotation / translation / orientation-sign flips
+    import math
+    from model_v2 import Matcher, score_matrix
+    torch.manual_seed(0)
+    gs = [torch.load(p, weights_only=False) for p in sorted(
+        __import__("glob").glob(os.path.join(graph_dir, "**", "*.pt"), recursive=True))[:8]]
+
+    def rotate(g, phi, tx, ty):
+        x = g.x.clone()
+        px, py = x[:, 0] * 256, x[:, 1] * 256
+        th = torch.atan2(x[:, 2], x[:, 3]) + phi + math.pi * (torch.arange(g.num_nodes) % 2)
+        x[:, 0] = (math.cos(phi) * px - math.sin(phi) * py + tx) / 256
+        x[:, 1] = (math.sin(phi) * px + math.cos(phi) * py + ty) / 256
+        x[:, 2], x[:, 3] = torch.sin(th), torch.cos(th)
+        out = g.clone()
+        out.x = x
+        return out
+
+    for arch in ("inv_global", "inv_local"):
+        m = Matcher(arch).eval()
+        diff = (score_matrix(m, gs[:4], gs[4:]) -
+                score_matrix(m, [rotate(g, 0.9, 15.0, -7.0) for g in gs[:4]], gs[4:])).abs().max().item()
+        assert diff < 1e-4, f"{arch} not invariant: {diff}"
+    print("[6/6] invariant matchers unchanged under rotate/translate/orientation-flip")
+
     print("\nSMOKE TEST PASSED")
 
 

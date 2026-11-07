@@ -27,9 +27,11 @@ def load_packed(packed):
 
 class FingerprintTripletDataset(Dataset):
     def __init__(self, graph_dir: str = None, seed: int = 42, subjects: list | None = None,
-                 packed=None, epoch_size: int | None = None, augment=None):
+                 packed=None, epoch_size: int | None = None, augment=None,
+                 attach_fid: bool = False):
         self._rng = random.Random(seed)
         self.augment = augment
+        self.attach_fid = attach_fid
         self.epoch_size = epoch_size
         self._cache = {}          # key -> Data (for the file-based path)
         self.samples = {}         # finger_id -> list of (key, Data-or-None)
@@ -55,6 +57,7 @@ class FingerprintTripletDataset(Dataset):
                     self.samples[fid] = [(p, None) for p in files]
 
         self.finger_ids = list(self.samples)
+        self._fid_index = {f: i for i, f in enumerate(self.finger_ids)}
         if len(self.finger_ids) < 2:
             raise ValueError(f"Need >=2 fingers with >=2 samples; found {len(self.finger_ids)}")
 
@@ -80,6 +83,10 @@ class FingerprintTripletDataset(Dataset):
             a = self.augment(a, "a", self._rng)
             p = self.augment(p, "p", self._rng)
             n = self.augment(n, "n", self._rng)
+        if self.attach_fid:   # finger index, lets a contrastive loss mask same-finger "negatives"
+            a.fid = torch.tensor([self._fid_index[fid]])
+            p.fid = torch.tensor([self._fid_index[fid]])
+            n.fid = torch.tensor([self._fid_index[neg_fid]])
         return a, p, n
 
 
