@@ -98,4 +98,11 @@ Run scripts from the repo root; each entry point adds `src/` to `sys.path` itsel
   18.0 %. Classical wins decisively — isolates what the GNN lacks (rotation
   invariance, precise local correspondence vs. global pooling). See
   `results/stage5_notes.md`.
-- **Next:** Stage 6 — partiality sweep (GNN vs classical as overlap shrinks).
+- **Stage 6 (partiality sweep) — done.** Probes cropped to 100/75/50/25/10 % of the print,
+  same crops for all methods, 200 test fingers. Classical Rank-1: 89.3 → 71.1 → 46.2 →
+  21.0 → 5.2 %. Trained GCN: 10.8 → 4.3 → 2.3 → 1.7 → 1.3 % (chance 0.5 %), no better
+  than the untrained net below 50 % area. The "GCN degrades more gracefully" hypothesis is
+  not supported by the current model, but the GCN was never trained on crops, so this is a
+  statement about the Stage 3 model, not about GCNs in general. See `results/stage6_notes.md`.
+- **Next:** Stage 7 — interactive matching interface (and crop/rotation-augmented
+  retraining to properly test the partial-print hypothesis).
