@@ -27,8 +27,9 @@ def load_packed(packed):
 
 class FingerprintTripletDataset(Dataset):
     def __init__(self, graph_dir: str = None, seed: int = 42, subjects: list | None = None,
-                 packed=None, epoch_size: int | None = None):
+                 packed=None, epoch_size: int | None = None, augment=None):
         self._rng = random.Random(seed)
+        self.augment = augment
         self.epoch_size = epoch_size
         self._cache = {}          # key -> Data (for the file-based path)
         self.samples = {}         # finger_id -> list of (key, Data-or-None)
@@ -74,7 +75,12 @@ class FingerprintTripletDataset(Dataset):
         while neg_fid == fid:
             neg_fid = self._rng.choice(self.finger_ids)
         nk, ng = self._rng.choice(self.samples[neg_fid])
-        return self._get(ak, ag), self._get(pk, pg), self._get(nk, ng)
+        a, p, n = self._get(ak, ag), self._get(pk, pg), self._get(nk, ng)
+        if self.augment is not None:
+            a = self.augment(a, "a", self._rng)
+            p = self.augment(p, "p", self._rng)
+            n = self.augment(n, "n", self._rng)
+        return a, p, n
 
 
 def triplet_collate(batch):

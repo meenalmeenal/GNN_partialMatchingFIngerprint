@@ -83,9 +83,15 @@ def make_plots(results, outdir):
     import matplotlib.pyplot as plt
 
     areas = [int(l * 100) for l in LEVELS]
-    series = [("classical", "Classical Hough", "#2f7d5d", "o"),
-              ("gnn_trained", "GCN (trained)", "#2f6ea5", "s"),
-              ("gnn_untrained", "GCN (untrained floor)", "#8a8f99", "^")]
+    first = results["levels"][str(areas[0])]
+    palette = ["#2f6ea5", "#c0562b", "#7a4aa8", "#b8860b"]
+    markers = ["s", "D", "v", "P"]
+    series = [("classical", "Classical Hough", "#2f7d5d", "o")]
+    extras = [k for k in first if k.startswith("gnn_") and k not in ("gnn_trained", "gnn_untrained")]
+    series.append(("gnn_trained", "GCN (Stage 3, full prints only)", palette[0], markers[0]))
+    for i, key in enumerate(extras):
+        series.append((key, "GCN (" + key[4:] + ")", palette[(i + 1) % 4], markers[(i + 1) % 4]))
+    series.append(("gnn_untrained", "GCN (untrained floor)", "#8a8f99", "^"))
     for metric, ylabel, fname, pct in [("rank1", "Rank-1 identification (%)", "sweep_rank1.png", True),
                                        ("eer", "Equal Error Rate (%)", "sweep_eer.png", True)]:
         plt.figure(figsize=(6.2, 4.4))
@@ -111,14 +117,24 @@ def main():
     ap.add_argument("--graph_dir", default="data/graphs")
     ap.add_argument("--limit-fingers", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--models", nargs="*", default=[],
+                    help="extra GCN checkpoints to score, as name=path")
+    ap.add_argument("--reuse-classical", default=None,
+                    help="sweep_metrics.json from an earlier run: reuse its classical results "
+                         "(valid because crops are deterministic for a given seed)")
     ap.add_argument("--outdir", default="results/stage6")
     args = ap.parse_args()
     os.makedirs(args.outdir, exist_ok=True)
     device = torch.device("cpu")
 
     model, cfg = load_model(args.checkpoint, device)
+    extra_models = {}
+    for spec in args.models:
+        name, path = spec.split("=", 1)
+        extra_models["gnn_" + name], _ = load_model(path, device)
+    reused = json.load(open(args.reuse_classical)) if args.reuse_classical else None
+    torch.manual_seed(0)  # seed BEFORE building so the untrained floor is reproducible
     untrained, _ = build_untrained_model("configs/default.yaml", device)
-    torch.manual_seed(0)  # untrained floor reproducible
 
     sp = json.load(open(args.splits))
     fingers = sp["test"][:args.limit_fingers]
@@ -143,20 +159,29 @@ def main():
             for g, _, _ in probes:
                 cg, n, fell = crop_graph(g, frac, rng)
                 graphs.append(cg); counts.append(n); fb += int(fell)
-        probes_m = [graph_to_minutiae(g) for g in graphs]
-        cm, _ = evaluate_classical(gallery_m, probes_m, pf_idx, fids)
+        if reused is not None:
+            old = reused["levels"][str(int(frac * 100))]
+            assert reused["n_probes"] == len(probes) and reused["seed"] == args.seed
+            assert abs(old["minutiae_per_probe"]["mean"] - float(np.mean(counts))) < 1e-9, "crops differ"
+            cm = old["classical"]
+        else:
+            probes_m = [graph_to_minutiae(g) for g in graphs]
+            cm, _ = evaluate_classical(gallery_m, probes_m, pf_idx, fids)
         entry = {
             "classical": {k: cm[k] for k in ("rank1", "rank5", "eer", "auc")},
             "gnn_trained": gnn_metrics(model, gallery_graphs, graphs, pf_idx, device),
             "gnn_untrained": gnn_metrics(untrained, gallery_graphs, graphs, pf_idx, device),
+            **{name: gnn_metrics(m, gallery_graphs, graphs, pf_idx, device)
+               for name, m in extra_models.items()},
             "minutiae_per_probe": {"mean": float(np.mean(counts)), "median": float(np.median(counts)),
                                    "min": int(np.min(counts))},
             "fallback_probes": fb,
         }
         results["levels"][str(int(frac * 100))] = entry
-        print(f"[{int(frac*100):3d}%] minutiae/probe mean={entry['minutiae_per_probe']['mean']:.1f}  "
-              f"R1 classical={cm['rank1']*100:.1f}  gcn={entry['gnn_trained']['rank1']*100:.1f}  "
-              f"untrained={entry['gnn_untrained']['rank1']*100:.1f}   ({time.time()-t0:.0f}s)")
+        line = "  ".join(f"{k[4:] if k.startswith('gnn_') else k}={v['rank1']*100:.1f}"
+                         for k, v in entry.items() if isinstance(v, dict) and "rank1" in v)
+        print(f"[{int(frac*100):3d}%] minutiae/probe={entry['minutiae_per_probe']['mean']:.1f}  "
+              f"R1: {line}   ({time.time()-t0:.0f}s)")
         json.dump(results, open(os.path.join(args.outdir, "sweep_metrics.json"), "w"), indent=2)
 
     make_plots(results, args.outdir)

@@ -26,6 +26,7 @@ from tqdm import tqdm
 
 from dataset import FingerprintTripletDataset, triplet_collate, split_subjects
 from model import TripletGCN
+from augment import GraphAugmenter
 
 
 @torch.no_grad()
@@ -91,17 +92,21 @@ def train(cfg, tag="run"):
     tr_src = os.path.join(packed_dir, "train.pt")
     va_src = os.path.join(packed_dir, "val.pt")
     use_packed = os.path.exists(tr_src)
+    aug_cfg = cfg["train"].get("augment")
+    augmenter = GraphAugmenter(crop=aug_cfg.get("crop", True), max_rot_deg=aug_cfg.get("max_rot_deg", 0.0))         if aug_cfg else None
+    print(f"augmentation: {aug_cfg if aug_cfg else 'none'}")
+    ckpt_name = cfg["train"].get("ckpt_name", "best_model")
     print(f"source: {'packed ' + packed_dir if use_packed else 'per-file ' + graph_dir}")
     t0 = time.time()
     train_ds = FingerprintTripletDataset(
         graph_dir=None if use_packed else graph_dir,
         packed=tr_src if use_packed else None,
-        subjects=train_subs, seed=cfg["train"]["seed"],
+        subjects=train_subs, seed=cfg["train"]["seed"], augment=augmenter,
         epoch_size=cfg["train"]["iters_per_epoch"] * cfg["train"]["batch_size"])
     val_ds = FingerprintTripletDataset(
         graph_dir=None if use_packed else graph_dir,
         packed=va_src if use_packed else None,
-        subjects=val_subs, seed=cfg["train"]["seed"] + 1,
+        subjects=val_subs, seed=cfg["train"]["seed"] + 1, augment=augmenter,
         epoch_size=cfg["train"].get("val_iters", 60) * cfg["train"]["batch_size"])
     print(f"train fingers={len(train_ds.finger_ids)}  val fingers={len(val_ds.finger_ids)}  "
           f"(loaded in {time.time() - t0:.0f}s)")
@@ -153,7 +158,7 @@ def train(cfg, tag="run"):
 
         if vl < best - 1e-4:
             best, bad = vl, 0
-            for path in (os.path.join(ckpt_dir, "best_model.pt"), os.path.join(outdir, "best_model.pt")):
+            for path in (os.path.join(ckpt_dir, ckpt_name + ".pt"), os.path.join(outdir, "best_model.pt")):
                 torch.save({"model_state": model.state_dict(), "config": cfg,
                             "epoch": epoch, "val_loss": vl}, path)
             print(f"  * new best (val {vl:.4f}) -> saved")
@@ -166,7 +171,7 @@ def train(cfg, tag="run"):
     csv_file.close()
     plot_curve(csv_path, os.path.join(outdir, "train_curve.png"))
     print(f"done. best val loss {best:.4f}. log -> {csv_path}, curve -> {outdir}/train_curve.png")
-    return os.path.join(ckpt_dir, "best_model.pt")
+    return os.path.join(ckpt_dir, ckpt_name + ".pt")
 
 
 def main():
@@ -178,6 +183,10 @@ def main():
     ap.add_argument("--limit-fingers", type=int)
     ap.add_argument("--patience", type=int)
     ap.add_argument("--lr", type=float)
+    ap.add_argument("--augment", choices=["none", "crop", "crop_rot"], default="none",
+                    help="train-time partial-print / rotation augmentation")
+    ap.add_argument("--max-rot-deg", type=float, default=30.0)
+    ap.add_argument("--ckpt-name", help="checkpoint file name in models/ (avoid overwriting best_model)")
     args = ap.parse_args()
 
     cfg = yaml.safe_load(open(args.config))
@@ -188,6 +197,10 @@ def main():
     if args.limit_fingers: cfg["train"]["limit_fingers"] = args.limit_fingers
     if args.patience: cfg["train"]["patience"] = args.patience
     if args.lr: cfg["train"]["lr"] = args.lr
+    if args.augment != "none":
+        cfg["train"]["augment"] = {"crop": True,
+                                   "max_rot_deg": args.max_rot_deg if args.augment == "crop_rot" else 0.0}
+    if args.ckpt_name: cfg["train"]["ckpt_name"] = args.ckpt_name
 
     train(cfg, tag=args.tag)
 

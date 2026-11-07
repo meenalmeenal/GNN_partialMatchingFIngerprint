@@ -104,5 +104,11 @@ Run scripts from the repo root; each entry point adds `src/` to `sys.path` itsel
   than the untrained net below 50 % area. The "GCN degrades more gracefully" hypothesis is
   not supported by the current model, but the GCN was never trained on crops, so this is a
   statement about the Stage 3 model, not about GCNs in general. See `results/stage6_notes.md`.
-- **Next:** Stage 7 — interactive matching interface (and crop/rotation-augmented
-  retraining to properly test the partial-print hypothesis).
+- **Stage 6b (augmented retraining) — done.** Retrained the GCN with random-crop (and
+  crop+rotation) augmentation and re-ran the sweep. Verification AUC at partial areas rises
+  by 0.05-0.06 (0.626 -> 0.685 at 50 %), but Rank-1 stays at 1-4 % (classical: 71 % at 75 %
+  area). So the collapse is **not** mainly a training-distribution problem; the global
+  embedding (absolute coordinates + mean/max pooling) is the limit. See
+  `results/stage6b_notes.md`.
+- **Next:** Stage 7 — interactive matching interface; then Stage 9 (architecture changes:
+  relative/rotation-invariant features, correspondence-style matching, hard negatives).
