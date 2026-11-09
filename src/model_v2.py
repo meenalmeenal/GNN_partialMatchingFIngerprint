@@ -167,3 +167,37 @@ def load_matcher(path, device="cpu"):
     m.load_state_dict(ck["model_state"])
     m.eval()
     return m
+
+
+@torch.no_grad()
+def encode_graphs(model, graphs, device="cpu", bs=128):
+    """Encode a list of Data graphs once: global arch -> [N, D]; local arch -> (dense, mask)."""
+    from torch_geometric.data import Batch
+    model.eval()
+    outs = [model.encode(Batch.from_data_list(graphs[i:i + bs]).to(device))
+            for i in range(0, len(graphs), bs)]
+    if not model.local:
+        return torch.cat(outs, 0)
+    k = max(o[0].size(1) for o in outs)
+    dense = torch.cat([F.pad(o[0], (0, 0, 0, k - o[0].size(1))) for o in outs], 0)
+    mask = torch.cat([F.pad(o[1], (0, k - o[1].size(1))) for o in outs], 0)
+    return dense, mask
+
+
+@torch.no_grad()
+def pair_scores(model, enc_q, enc_g, qi, gi, chunk=256):
+    """Scores for an explicit list of (query index, gallery index) pairs -> 1-D tensor."""
+    qi, gi = torch.as_tensor(qi), torch.as_tensor(gi)
+    if not model.local:
+        return (enc_q[qi] * enc_g[gi]).sum(1)
+    qd, qm = enc_q
+    gd, gm = enc_g
+    out = []
+    for s in range(0, len(qi), chunk):
+        a, b = qi[s:s + chunk], gi[s:s + chunk]
+        sims = torch.einsum("bqd,bkd->bqk", qd[a], gd[b])
+        sims = sims.masked_fill(~gm[b][:, None, :], -2.0)
+        best = sims.max(dim=2).values
+        m = qm[a].float()
+        out.append((best * m).sum(1) / m.sum(1).clamp_min(1))
+    return torch.cat(out)

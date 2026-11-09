@@ -44,10 +44,55 @@ def build_graph_fast(px, py, th, ty, k=5):
                 edge_attr=torch.from_numpy(eattr), num_nodes=n)
 
 
+def _impression_noise(px, py, th, ty, cfg, rng):
+    """Simulate an independent impression of the same finger: smooth elastic warp, per-minutia
+    position/orientation jitter, missed minutiae, spurious minutiae, occasional type flips.
+    (SOCOFing probes are copies of the gallery impression, so a model trained on them has
+    never seen any of this.)  Strengths in cfg are maxima; each print draws its own level."""
+    n = len(px)
+    amp = rng.uniform(0.0, cfg.get("warp_px", 4.0))
+    if amp > 0:
+        for _ in range(2):                                   # two random low-frequency waves
+            w = rng.uniform(0.01, 0.04)
+            ang = rng.uniform(0, math.pi)
+            ph = rng.uniform(0, 2 * math.pi)
+            kx, ky = w * math.cos(ang), w * math.sin(ang)
+            wave = np.sin(2 * math.pi * (kx * px + ky * py) + ph)
+            dx = amp * wave * rng.uniform(-1, 1)
+            dy = amp * wave * rng.uniform(-1, 1)
+            px, py = px + dx, py + dy
+    jit = rng.uniform(0.0, cfg.get("jitter_px", 2.0))
+    px = px + np.array([rng.gauss(0, jit) for _ in range(n)])
+    py = py + np.array([rng.gauss(0, jit) for _ in range(n)])
+    th = th + np.array([rng.gauss(0, cfg.get("angle_rad", 0.2)) for _ in range(n)])
+    keep = np.array([rng.random() > rng.uniform(0.0, 1.0) * cfg.get("drop", 0.3) for _ in range(n)])
+    if keep.sum() < 2:
+        keep[:2] = True
+    px, py, th, ty = px[keep], py[keep], th[keep], ty[keep].copy()
+    flip = np.array([rng.random() < cfg.get("type_flip", 0.1) for _ in range(len(ty))])
+    ty = np.where(flip, 1.0 - ty, ty)
+    n_sp = int(len(px) * rng.uniform(0.0, 1.0) * cfg.get("spurious", 0.3))
+    if n_sp > 0:
+        lo_x, hi_x, lo_y, hi_y = px.min(), px.max(), py.min(), py.max()
+        sx = np.array([rng.uniform(lo_x, hi_x) for _ in range(n_sp)])
+        sy = np.array([rng.uniform(lo_y, hi_y) for _ in range(n_sp)])
+        px, py = np.concatenate([px, sx]), np.concatenate([py, sy])
+        th = np.concatenate([th, np.array([rng.uniform(-math.pi, math.pi) for _ in range(n_sp)])])
+        ty = np.concatenate([ty, np.array([float(rng.random() < 0.5) for _ in range(n_sp)])])
+    return px, py, th, ty
+
+
 class GraphAugmenter:
     def __init__(self, crop=True, max_rot_deg=0.0, p_full=0.15, min_frac=0.10,
-                 p_anchor=1.0, p_other=0.3):
+                 p_anchor=1.0, p_other=0.3, crop_roles=("a", "p", "n"), noise=None,
+                 noise_roles=(), bbox_crop=False):
+        """noise: dict of impression-noise strengths (see _impression_noise), applied to
+        `noise_roles`; crop applies only to `crop_roles`."""
         self.crop = crop
+        self.crop_roles = set(crop_roles)
+        self.noise = noise
+        self.noise_roles = set(noise_roles)
+        self.bbox_crop = bbox_crop      # crop relative to the print's own extent (needed for FVC)
         self.max_rot = math.radians(max_rot_deg)
         self.p_full = p_full
         self.min_frac = min_frac
@@ -68,14 +113,19 @@ class GraphAugmenter:
             th = th + phi
 
         idx = np.arange(len(px))
-        if self.crop and rng.random() > self.p_full:
+        if self.crop and role in self.crop_roles and rng.random() > self.p_full:
             frac = rng.uniform(self.min_frac, 1.0)
-            side = math.sqrt(frac) * IMG_PX
+            if self.bbox_crop:
+                bx0, bx1, by0, by1 = px.min(), px.max(), py.min(), py.max()
+                side = math.sqrt(frac) * max(bx1 - bx0, by1 - by0, 1.0)
+            else:
+                bx0, bx1, by0, by1 = 0.0, float(IMG_PX), 0.0, float(IMG_PX)
+                side = math.sqrt(frac) * IMG_PX
             best, best_n = None, -1
             for _ in range(25):
                 ci = rng.randrange(len(px))
-                x0 = min(max(px[ci] - side / 2, 0), IMG_PX - side)
-                y0 = min(max(py[ci] - side / 2, 0), IMG_PX - side)
+                x0 = min(max(px[ci] - side / 2, bx0), max(bx1 - side, bx0))
+                y0 = min(max(py[ci] - side / 2, by0), max(by1 - side, by0))
                 sel = np.where((px >= x0) & (px <= x0 + side) & (py >= y0) & (py <= y0 + side))[0]
                 if len(sel) > best_n:
                     best, best_n = sel, len(sel)
@@ -87,4 +137,7 @@ class GraphAugmenter:
             idx = best
 
         idx = np.asarray(idx)
-        return build_graph_fast(px[idx], py[idx], th[idx], ty[idx])
+        px, py, th, ty = px[idx], py[idx], th[idx], ty[idx]
+        if self.noise and role in self.noise_roles:
+            px, py, th, ty = _impression_noise(px, py, th, ty, self.noise, rng)
+        return build_graph_fast(px, py, th, ty)

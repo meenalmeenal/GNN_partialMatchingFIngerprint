@@ -119,5 +119,13 @@ Run scripts from the repo root; each entry point adds `src/` to `sys.path` itsel
   Full 900-finger protocol: Rank-1 73.1 % (Stage 3: 3.8 %). Caveats: SOCOFing probes are edited
   copies of the gallery impression (cross-dataset FVC test is the key open risk), single seeds,
   model not fully converged. See `results/stage9_notes.md`.
-- **Next:** Stage 7 — interactive matching interface on the Stage 9 model; then Stage 8
-  (FVC cross-dataset, distortion augmentation).
+- **Stage 8 (cross-dataset robustness, real FVC prints) — done; sobering.** SOCOFing probes are
+  edited copies of the gallery print, so everything collapses on real independent impressions:
+  the Stage 9 matcher goes from 78 % to 13 % Rank-1, classical from 89 % to 17 % (held-out FVC
+  fingers, chance 2 %), i.e. the bottom of the FVC2002 field. Cause is mainly the minutiae
+  pipeline (extraction repeatability, AUC 0.66; a ridge-scale bug was found and fixed), not the
+  matcher. Fine-tuning the learned matcher on a little real FVC data gives the best result
+  everywhere (21.4 vs classical 17.1 % at 100 % area, 14.2 vs 8.4 % at 25 %, better on all 8
+  databases); synthetic noise augmentation hurt. See `results/stage8_notes.md`.
+- **Next:** a robust minutiae extractor (MINDTCT / learned) is the highest-value step; Stage 7
+  (interface) can run on the Stage 9 or fine-tuned model.

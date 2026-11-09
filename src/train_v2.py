@@ -69,6 +69,12 @@ def main():
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--splits", default="models/splits.json")
     ap.add_argument("--packed-dir", default="data/packed")
+    ap.add_argument("--noise", action="store_true",
+                    help="simulate independent impressions (warp, jitter, missed/spurious minutiae) "
+                         "on query AND gallery prints")
+    ap.add_argument("--fvc-dbs", nargs="*", default=[],
+                    help="fine-tune on real FVC impressions from these data/fvc_packed/<db>.pt "
+                         "(training fingers 1-40, validation 41-50; fingers 51-100 stay held out)")
     ap.add_argument("--init", default=None, help="warm-start from a Matcher checkpoint "
                     "(same architecture); optimizer and LR schedule restart")
     args = ap.parse_args()
@@ -82,14 +88,36 @@ def main():
     ckpt_name = args.ckpt_name or args.tag
 
     sp = json.load(open(args.splits))
-    aug = GraphAugmenter(crop=True, max_rot_deg=0.0, p_anchor=1.0, p_other=0.0)
+    if args.noise:
+        aug = GraphAugmenter(crop=True, max_rot_deg=0.0, p_anchor=1.0, p_other=1.0, crop_roles=("a",),
+                             noise={"warp_px": 4.0, "jitter_px": 2.0, "angle_rad": 0.2, "drop": 0.3,
+                                    "spurious": 0.3, "type_flip": 0.1}, noise_roles=("a", "p"))
+    else:
+        aug = GraphAugmenter(crop=True, max_rot_deg=0.0, p_anchor=1.0, p_other=0.0)
     t0 = time.time()
-    train_ds = FingerprintTripletDataset(
-        packed=os.path.join(args.packed_dir, "train.pt"), subjects=sp["train"], seed=args.seed,
-        augment=aug, attach_fid=True, epoch_size=args.iters_per_epoch * args.batch_size)
-    val_ds = FingerprintTripletDataset(
-        packed=os.path.join(args.packed_dir, "val.pt"), subjects=sp["val"], seed=args.seed + 1,
-        augment=aug, attach_fid=True, epoch_size=40 * args.batch_size)
+    if args.fvc_dbs:
+        tr_pack, va_pack = {}, {}
+        for db in args.fvc_dbs:
+            d = torch.load(os.path.join("data/fvc_packed", db + ".pt"), weights_only=False)
+            for f, imps in d.items():
+                if len(imps) >= 2:
+                    if f <= 40:
+                        tr_pack[f"{db}_{f}"] = imps
+                    elif f <= 50:
+                        va_pack[f"{db}_{f}"] = imps
+        # FVC prints vary in size: crop relative to each print's own extent
+        aug.bbox_crop = True
+        train_ds = FingerprintTripletDataset(packed=tr_pack, subjects=list(tr_pack), seed=args.seed,
+            augment=aug, attach_fid=True, epoch_size=args.iters_per_epoch * args.batch_size)
+        val_ds = FingerprintTripletDataset(packed=va_pack, subjects=list(va_pack), seed=args.seed + 1,
+            augment=aug, attach_fid=True, epoch_size=40 * args.batch_size)
+    else:
+        train_ds = FingerprintTripletDataset(
+            packed=os.path.join(args.packed_dir, "train.pt"), subjects=sp["train"], seed=args.seed,
+            augment=aug, attach_fid=True, epoch_size=args.iters_per_epoch * args.batch_size)
+        val_ds = FingerprintTripletDataset(
+            packed=os.path.join(args.packed_dir, "val.pt"), subjects=sp["val"], seed=args.seed + 1,
+            augment=aug, attach_fid=True, epoch_size=40 * args.batch_size)
     print(f"arch={args.arch} train fingers={len(train_ds.finger_ids)} val={len(val_ds.finger_ids)} "
           f"(loaded in {time.time() - t0:.0f}s)", flush=True)
 

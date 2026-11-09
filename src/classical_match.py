@@ -190,3 +190,56 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def hough_score_line(P: np.ndarray, G: np.ndarray, xy_bin=8.0, ang_bin=0.35,
+                     xy_tol=12.0, ang_tol=0.5) -> float:
+    """hough_score with orientation treated as an undirected LINE (mod pi).
+
+    The extractor's minutia orientation has an arbitrary sign. That is harmless when probe and
+    gallery are copies of one impression (SOCOFing) but corrupts the rotation votes for
+    independent impressions (FVC). Each pair therefore votes for both rotation candidates
+    d_theta and d_theta + pi, and the orientation check compares angles modulo pi."""
+    n, m = len(P), len(G)
+    if n == 0 or m == 0:
+        return 0.0
+    same_type = P[:, 3][:, None] == G[:, 3][None, :]
+    if not same_type.any():
+        pi, gj = np.repeat(np.arange(n), m), np.tile(np.arange(m), n)
+    else:
+        pi, gj = np.where(same_type)
+    dth0 = _wrap(G[gj, 2] - P[pi, 2])
+    pi2, gj2 = np.concatenate([pi, pi]), np.concatenate([gj, gj])
+    dtheta = np.concatenate([dth0, _wrap(dth0 + np.pi)])
+    c, s = np.cos(dtheta), np.sin(dtheta)
+    rx = P[pi2, 0] * c - P[pi2, 1] * s
+    ry = P[pi2, 0] * s + P[pi2, 1] * c
+    dx = G[gj2, 0] - rx
+    dy = G[gj2, 1] - ry
+    key = ((np.round(dx / xy_bin).astype(np.int64) + 4096) * (8192 * 64)
+           + (np.round(dy / xy_bin).astype(np.int64) + 4096) * 64
+           + (np.round(dtheta / ang_bin).astype(np.int64) + 32))
+    uniq, counts = np.unique(key, return_counts=True)
+    sel = key == uniq[np.argmax(counts)]
+    tx, ty, tth = float(np.median(dx[sel])), float(np.median(dy[sel])), float(np.median(dtheta[sel]))
+
+    c, s = np.cos(tth), np.sin(tth)
+    qx = P[:, 0] * c - P[:, 1] * s + tx
+    qy = P[:, 0] * s + P[:, 1] * c + ty
+    qth = P[:, 2] + tth
+    d2 = (qx[:, None] - G[None, :, 0]) ** 2 + (qy[:, None] - G[None, :, 1]) ** 2
+    dang = np.abs(_wrap(2.0 * (qth[:, None] - G[None, :, 2]))) / 2.0      # modulo pi
+    ok = (d2 <= xy_tol ** 2) & (dang <= ang_tol) & (P[:, 3][:, None] == G[None, :, 3])
+    d2m = np.where(ok, d2, np.inf)
+    matched, used = 0, set()
+    for i in np.argsort(d2m.min(axis=1)):
+        if not np.isfinite(d2m[i]).any():
+            continue
+        row = d2m[i].copy()
+        if used:
+            row[list(used)] = np.inf
+        if not np.isfinite(row).any():
+            continue
+        used.add(int(np.argmin(row)))
+        matched += 1
+    return 2.0 * matched / (n + m)
