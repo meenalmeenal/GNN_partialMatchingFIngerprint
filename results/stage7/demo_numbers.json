@@ -1,0 +1,398 @@
+{
+  "socofing": {
+    "100": {
+      "learned": {
+        "rank1": 0.7166666666666667,
+        "rank5": 0.8,
+        "median_rank": 1.0
+      },
+      "classical": {
+        "rank1": 0.81,
+        "rank5": 0.92,
+        "median_rank": 1.0
+      },
+      "n_queries": 300,
+      "gallery": 900
+    },
+    "50": {
+      "learned": {
+        "rank1": 0.15666666666666668,
+        "rank5": 0.22666666666666666,
+        "median_rank": 169.5
+      },
+      "classical": {
+        "rank1": 0.15333333333333332,
+        "rank5": 0.25,
+        "median_rank": 80.0
+      },
+      "n_queries": 300,
+      "gallery": 900
+    },
+    "25": {
+      "learned": {
+        "rank1": 0.10666666666666667,
+        "rank5": 0.16,
+        "median_rank": 210.0
+      },
+      "classical": {
+        "rank1": 0.04,
+        "rank5": 0.08,
+        "median_rank": 241.5
+      },
+      "n_queries": 300,
+      "gallery": 900
+    }
+  },
+  "fvc2002_db1": {
+    "100": {
+      "learned": {
+        "rank1": 0.3,
+        "rank5": 0.52,
+        "median_rank": 5.0
+      },
+      "classical": {
+        "rank1": 0.28,
+        "rank5": 0.34,
+        "median_rank": 17.0
+      },
+      "n_queries": 50,
+      "gallery": 50
+    },
+    "50": {
+      "learned": {
+        "rank1": 0.22,
+        "rank5": 0.46,
+        "median_rank": 6.5
+      },
+      "classical": {
+        "rank1": 0.2,
+        "rank5": 0.32,
+        "median_rank": 9.0
+      },
+      "n_queries": 50,
+      "gallery": 50
+    },
+    "25": {
+      "learned": {
+        "rank1": 0.2,
+        "rank5": 0.42,
+        "median_rank": 10.5
+      },
+      "classical": {
+        "rank1": 0.08,
+        "rank5": 0.22,
+        "median_rank": 18.0
+      },
+      "n_queries": 50,
+      "gallery": 50
+    }
+  },
+  "fvc2002_db2": {
+    "100": {
+      "learned": {
+        "rank1": 0.34,
+        "rank5": 0.58,
+        "median_rank": 3.0
+      },
+      "classical": {
+        "rank1": 0.24,
+        "rank5": 0.36,
+        "median_rank": 12.0
+      },
+      "n_queries": 50,
+      "gallery": 50
+    },
+    "50": {
+      "learned": {
+        "rank1": 0.32,
+        "rank5": 0.48,
+        "median_rank": 6.5
+      },
+      "classical": {
+        "rank1": 0.26,
+        "rank5": 0.32,
+        "median_rank": 19.0
+      },
+      "n_queries": 50,
+      "gallery": 50
+    },
+    "25": {
+      "learned": {
+        "rank1": 0.12,
+        "rank5": 0.36,
+        "median_rank": 10.0
+      },
+      "classical": {
+        "rank1": 0.12,
+        "rank5": 0.22,
+        "median_rank": 22.5
+      },
+      "n_queries": 50,
+      "gallery": 50
+    }
+  },
+  "fvc2002_db3": {
+    "100": {
+      "learned": {
+        "rank1": 0.24,
+        "rank5": 0.42,
+        "median_rank": 10.0
+      },
+      "classical": {
+        "rank1": 0.18,
+        "rank5": 0.26,
+        "median_rank": 17.5
+      },
+      "n_queries": 50,
+      "gallery": 50
+    },
+    "50": {
+      "learned": {
+        "rank1": 0.26,
+        "rank5": 0.4,
+        "median_rank": 11.5
+      },
+      "classical": {
+        "rank1": 0.12,
+        "rank5": 0.32,
+        "median_rank": 17.5
+      },
+      "n_queries": 50,
+      "gallery": 50
+    },
+    "25": {
+      "learned": {
+        "rank1": 0.14,
+        "rank5": 0.26,
+        "median_rank": 16.0
+      },
+      "classical": {
+        "rank1": 0.06,
+        "rank5": 0.14,
+        "median_rank": 24.5
+      },
+      "n_queries": 50,
+      "gallery": 50
+    }
+  },
+  "fvc2002_db4": {
+    "100": {
+      "learned": {
+        "rank1": 0.14,
+        "rank5": 0.36,
+        "median_rank": 9.5
+      },
+      "classical": {
+        "rank1": 0.14,
+        "rank5": 0.24,
+        "median_rank": 17.5
+      },
+      "n_queries": 50,
+      "gallery": 50
+    },
+    "50": {
+      "learned": {
+        "rank1": 0.1,
+        "rank5": 0.44,
+        "median_rank": 7.5
+      },
+      "classical": {
+        "rank1": 0.16,
+        "rank5": 0.2,
+        "median_rank": 22.0
+      },
+      "n_queries": 50,
+      "gallery": 50
+    },
+    "25": {
+      "learned": {
+        "rank1": 0.06,
+        "rank5": 0.32,
+        "median_rank": 14.5
+      },
+      "classical": {
+        "rank1": 0.04,
+        "rank5": 0.2,
+        "median_rank": 15.0
+      },
+      "n_queries": 50,
+      "gallery": 50
+    }
+  },
+  "fvc2004_db1": {
+    "100": {
+      "learned": {
+        "rank1": 0.08,
+        "rank5": 0.24,
+        "median_rank": 18.5
+      },
+      "classical": {
+        "rank1": 0.1,
+        "rank5": 0.26,
+        "median_rank": 19.0
+      },
+      "n_queries": 50,
+      "gallery": 50
+    },
+    "50": {
+      "learned": {
+        "rank1": 0.1,
+        "rank5": 0.2,
+        "median_rank": 23.0
+      },
+      "classical": {
+        "rank1": 0.02,
+        "rank5": 0.14,
+        "median_rank": 23.0
+      },
+      "n_queries": 50,
+      "gallery": 50
+    },
+    "25": {
+      "learned": {
+        "rank1": 0.08,
+        "rank5": 0.2,
+        "median_rank": 23.0
+      },
+      "classical": {
+        "rank1": 0.02,
+        "rank5": 0.08,
+        "median_rank": 30.0
+      },
+      "n_queries": 50,
+      "gallery": 50
+    }
+  },
+  "fvc2004_db2": {
+    "100": {
+      "learned": {
+        "rank1": 0.1,
+        "rank5": 0.22,
+        "median_rank": 14.0
+      },
+      "classical": {
+        "rank1": 0.04,
+        "rank5": 0.14,
+        "median_rank": 31.5
+      },
+      "n_queries": 50,
+      "gallery": 50
+    },
+    "50": {
+      "learned": {
+        "rank1": 0.14,
+        "rank5": 0.32,
+        "median_rank": 13.0
+      },
+      "classical": {
+        "rank1": 0.04,
+        "rank5": 0.18,
+        "median_rank": 27.0
+      },
+      "n_queries": 50,
+      "gallery": 50
+    },
+    "25": {
+      "learned": {
+        "rank1": 0.0,
+        "rank5": 0.16,
+        "median_rank": 18.0
+      },
+      "classical": {
+        "rank1": 0.04,
+        "rank5": 0.14,
+        "median_rank": 23.0
+      },
+      "n_queries": 50,
+      "gallery": 50
+    }
+  },
+  "fvc2004_db3": {
+    "100": {
+      "learned": {
+        "rank1": 0.3,
+        "rank5": 0.44,
+        "median_rank": 9.5
+      },
+      "classical": {
+        "rank1": 0.24,
+        "rank5": 0.4,
+        "median_rank": 14.5
+      },
+      "n_queries": 50,
+      "gallery": 50
+    },
+    "50": {
+      "learned": {
+        "rank1": 0.24,
+        "rank5": 0.4,
+        "median_rank": 7.5
+      },
+      "classical": {
+        "rank1": 0.22,
+        "rank5": 0.38,
+        "median_rank": 17.5
+      },
+      "n_queries": 50,
+      "gallery": 50
+    },
+    "25": {
+      "learned": {
+        "rank1": 0.14,
+        "rank5": 0.36,
+        "median_rank": 10.5
+      },
+      "classical": {
+        "rank1": 0.1,
+        "rank5": 0.22,
+        "median_rank": 21.5
+      },
+      "n_queries": 50,
+      "gallery": 50
+    }
+  },
+  "fvc2004_db4": {
+    "100": {
+      "learned": {
+        "rank1": 0.24,
+        "rank5": 0.46,
+        "median_rank": 7.0
+      },
+      "classical": {
+        "rank1": 0.12,
+        "rank5": 0.28,
+        "median_rank": 17.0
+      },
+      "n_queries": 50,
+      "gallery": 50
+    },
+    "50": {
+      "learned": {
+        "rank1": 0.08,
+        "rank5": 0.32,
+        "median_rank": 9.5
+      },
+      "classical": {
+        "rank1": 0.14,
+        "rank5": 0.3,
+        "median_rank": 11.5
+      },
+      "n_queries": 50,
+      "gallery": 50
+    },
+    "25": {
+      "learned": {
+        "rank1": 0.1,
+        "rank5": 0.22,
+        "median_rank": 13.0
+      },
+      "classical": {
+        "rank1": 0.08,
+        "rank5": 0.1,
+        "median_rank": 24.0
+      },
+      "n_queries": 50,
+      "gallery": 50
+    }
+  }
+}

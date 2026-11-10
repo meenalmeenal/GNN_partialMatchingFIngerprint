@@ -41,6 +41,7 @@ models/          saved checkpoints (gitignored)
 ## Setup
 ```bash
 pip install torch torchvision torch-geometric opencv-python scikit-image scikit-learn numpy pyyaml
+pip install streamlit matplotlib      # only for the interactive demo (Stage 7)
 ```
 
 ## Quick start
@@ -64,6 +65,17 @@ python src/evaluate.py --gallery data/graphs --test data/graphs
 python src/match.py --partial path/to/partial.png --gallery data/graphs
 ```
 Run scripts from the repo root; each entry point adds `src/` to `sys.path` itself.
+
+## Interactive demo (Stage 7)
+```bash
+streamlit run app/app.py
+```
+Pick a gallery (SOCOFing test split or an FVC database), then either choose a sample probe or upload
+a fingerprint image, cut it down to a partial print with the area / window sliders, and see the closest
+enrolled prints from the learned matcher next to the classical matcher, with the minutiae
+correspondences that produced the score. Needs `data/packed/test.pt` and the checkpoints in
+`results/stage9_inv_local_cont/` and `results/stage8_inv_local_fvcft/` (or `models/`); the FVC galleries
+additionally need `data/fvc_packed/` and the FVC images (Stage 8).
 
 ## Status
 🚧 Work in progress.
@@ -127,5 +139,11 @@ Run scripts from the repo root; each entry point adds `src/` to `sys.path` itsel
   matcher. Fine-tuning the learned matcher on a little real FVC data gives the best result
   everywhere (21.4 vs classical 17.1 % at 100 % area, 14.2 vs 8.4 % at 25 %, better on all 8
   databases); synthetic noise augmentation hurt. See `results/stage8_notes.md`.
-- **Next:** a robust minutiae extractor (MINDTCT / learned) is the highest-value step; Stage 7
-  (interface) can run on the Stage 9 or fine-tuned model.
+- **Stage 7 (interactive demo) — done.** `streamlit run app/app.py`: choose a gallery (SOCOFing test or
+  an FVC database), pick a sample probe or upload an image, cut it to a partial print, and see the closest
+  enrolled prints from the learned matcher beside the classical matcher, with minutiae overlay,
+  correspondence lines and score histogram. Demo-protocol Rank-1 (random window, whole gallery): SOCOFing
+  900-print gallery 71.7 / 15.7 / 10.7 % at 100/50/25 % area (classical 81.0 / 15.3 / 4.0); real FVC
+  (50-print galleries) 22.7 / 21.3 / 11.3 % (classical 18.0 / 14.3 / 7.0). Far below the Stage 9 sweep at
+  partial areas (bigger gallery, sparser windows; not separated). See `results/stage7_notes.md`.
+- **Next:** a robust minutiae extractor (MINDTCT / learned) is the highest-value step; then improve the demo.
