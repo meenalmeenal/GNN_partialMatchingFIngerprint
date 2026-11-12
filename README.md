@@ -146,4 +146,11 @@ additionally need `data/fvc_packed/` and the FVC images (Stage 8).
   900-print gallery 71.7 / 15.7 / 10.7 % at 100/50/25 % area (classical 81.0 / 15.3 / 4.0); real FVC
   (50-print galleries) 22.7 / 21.3 / 11.3 % (classical 18.0 / 14.3 / 7.0). Far below the Stage 9 sweep at
   partial areas (bigger gallery, sparser windows; not separated). See `results/stage7_notes.md`.
+- **Stage 9c (evaluation fixes) — done.** Full 900-finger gallery with bootstrap CIs and 3 probe/crop seeds, an open-set
+  test, and a classical baseline tuned on FVC set B. The Stage 7 gap was mostly window placement: at 50 % area the same model
+  gets 42.7 % with minutia-centred windows vs 14.9 % with uniform random ones (900-print gallery). Learned vs classical:
+  classical wins at 100/75 % (83/64 vs 72/53 %), tie at 50 %, learned clearly ahead at 25/10 % (33.0 vs 13.2, 18.3 vs 1.4 %).
+  Open-set rejection works but the learned score needs z-normalisation. A tuned classical matcher equals the FVC-fine-tuned
+  learned model at full area (21.4 %) so the learned advantage on real prints is limited to partial areas. Training-seed
+  variance is not yet measured. See `results/stage9c_notes.md`.
 - **Next:** a robust minutiae extractor (MINDTCT / learned) is the highest-value step; then improve the demo.

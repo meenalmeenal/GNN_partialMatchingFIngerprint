@@ -173,6 +173,8 @@ def main():
     ap.add_argument("--no-classical", action="store_true")
     ap.add_argument("--classical-line", action="store_true",
                     help="also score the orientation-mod-pi variant of the classical matcher")
+    ap.add_argument("--classical-tuned", default=None,
+                    help="json from tune_classical.py: also score the Hough matcher with those tolerances")
     ap.add_argument("--levels", nargs="*", type=float, default=LEVELS)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--finger-range", default=None, help="e.g. 51-100: evaluate only these fingers "
@@ -195,6 +197,10 @@ def main():
           f"{np.median([g.num_nodes for g in g_graphs]):.0f}", flush=True)
 
     scorers = [] if args.no_classical else [Classical()]
+    if args.classical_tuned:      # Hough tolerances tuned on FVC set B (src/tune_classical.py)
+        import functools
+        tuned = json.load(open(args.classical_tuned))["tuned"]["params"]
+        scorers.append(Classical("classical_tuned", functools.partial(hough_score, **tuned)))
     if args.classical_line:
         scorers.append(Classical("classical_line", hough_score_line))
     scorers += [OldGCN(n, p) for n, p in (s.split("=", 1) for s in args.old)]
