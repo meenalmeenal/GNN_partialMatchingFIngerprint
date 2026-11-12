@@ -1,0 +1,35 @@
+    ours                 02DB1: AUC 0.746  genuine 0.22  impostor 0.16  minutiae 43  (12s)
+    ours                 02DB2: AUC 0.807  genuine 0.21  impostor 0.15  minutiae 56  (16s)
+    ours                 02DB3: AUC 0.632  genuine 0.21  impostor 0.19  minutiae 38  (11s)
+    ours                 04DB1: AUC 0.540  genuine 0.23  impostor 0.22  minutiae 32  (19s)
+    ours                 04DB2: AUC 0.579  genuine 0.18  impostor 0.16  minutiae 45  (11s)
+ours                 meanAUC 0.661  genuine-match 0.21  impostor 0.17  minutiae/print 43
+    leader_norm          02DB1: AUC 0.944  genuine 0.35  impostor 0.17  minutiae 38  (67s)
+    leader_norm          02DB2: AUC 0.980  genuine 0.35  impostor 0.15  minutiae 45  (54s)
+    leader_norm          02DB3: AUC 0.831  genuine 0.38  impostor 0.25  minutiae 22  (32s)
+    leader_norm          04DB1: AUC 0.817  genuine 0.30  impostor 0.18  minutiae 36  (90s)
+    leader_norm          04DB2: AUC 0.853  genuine 0.32  impostor 0.21  minutiae 30  (32s)
+leader_norm          meanAUC 0.885  genuine-match 0.34  impostor 0.19  minutiae/print 34
+    leader_raw           02DB1: AUC 0.942  genuine 0.36  impostor 0.17  minutiae 38  (72s)
+    leader_raw           02DB2: AUC 0.985  genuine 0.35  impostor 0.15  minutiae 44  (57s)
+    leader_raw           02DB3: AUC 0.837  genuine 0.38  impostor 0.24  minutiae 21  (33s)
+    leader_raw           04DB1: AUC 0.848  genuine 0.30  impostor 0.18  minutiae 36  (116s)
+    leader_raw           04DB2: AUC 0.863  genuine 0.32  impostor 0.20  minutiae 30  (45s)
+leader_raw           meanAUC 0.895  genuine-match 0.34  impostor 0.19  minutiae/print 34
+    leader_norm_dpi433   02DB1: AUC 0.947  genuine 0.36  impostor 0.17  minutiae 38  (69s)
+    leader_norm_dpi433   02DB2: AUC 0.980  genuine 0.35  impostor 0.15  minutiae 46  (73s)
+    leader_norm_dpi433   02DB3: AUC 0.829  genuine 0.36  impostor 0.23  minutiae 22  (45s)
+    leader_norm_dpi433   04DB1: AUC 0.848  genuine 0.29  impostor 0.18  minutiae 36  (169s)
+    leader_norm_dpi433   04DB2: AUC 0.844  genuine 0.32  impostor 0.20  minutiae 32  (49s)
+leader_norm_dpi433   meanAUC 0.890  genuine-match 0.34  impostor 0.18  minutiae/print 35
+
+[exited with code 0]
+
+leader_low quality>=0.30: meanAUC 0.904  per-DB 0.94 0.98 0.89 0.86 0.86  minutiae/print 38
+leader_low quality>=0.40: meanAUC 0.902  per-DB 0.94 0.97 0.87 0.86 0.86  minutiae/print 37
+leader_low quality>=0.50: meanAUC 0.898  per-DB 0.95 0.98 0.86 0.84 0.86  minutiae/print 35
+leader_low quality>=0.60: meanAUC 0.885  per-DB 0.94 0.98 0.83 0.82 0.85  minutiae/print 34
+leader_low quality>=0.70: meanAUC 0.884  per-DB 0.94 0.98 0.84 0.83 0.83  minutiae/print 32
+leader_low quality>=0.80: meanAUC 0.855  per-DB 0.93 0.98 0.80 0.77 0.80  minutiae/print 29
+
+[exited with code 0]

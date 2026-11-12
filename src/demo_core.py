@@ -71,9 +71,11 @@ class SocoDataset:
     real = False
     gallery_key = GALLERY_TAG
 
-    def __init__(self):
-        self.packed = torch.load(os.path.join(ROOT, "data", "packed", "test.pt"), weights_only=False)
-        self.fingers = sorted(self.packed)
+    def __init__(self, packed_dir="data/packed"):
+        self.packed = torch.load(os.path.join(ROOT, packed_dir, "test.pt"), weights_only=False)
+        # a finger needs a gallery print and at least one altered probe (graphs from a stricter extractor
+        # can be missing for badly damaged prints)
+        self.fingers = sorted(f for f, d in self.packed.items() if GALLERY_TAG in d and len(d) > 1)
 
     def query_keys(self, f):
         return sorted(k for k in self.packed[f] if k != GALLERY_TAG)
@@ -128,13 +130,13 @@ class FvcDataset:
     real = True
     gallery_key = 1
 
-    def __init__(self, name):
+    def __init__(self, name, packed_dir="data/fvc_packed"):
         self.key = name                                     # e.g. fvc2002_db1
         y, db = int(name[3:7]), int(name[-1])
         self.dir = os.path.join(FVC_ROOT, f"FVC{y}", "Dbs", f"Db{db}_a")
         kind = "synthetic SFinGe" if db == 4 else "real sensor"
         self.title = f"FVC{y} DB{db} - independent impressions ({kind}, 50 held-out fingers)"
-        packed = torch.load(os.path.join(ROOT, "data", "fvc_packed", name + ".pt"), weights_only=False)
+        packed = torch.load(os.path.join(ROOT, packed_dir, name + ".pt"), weights_only=False)
         self.fingers = [f for f in sorted(packed) if FVC_HELDOUT[0] <= f <= FVC_HELDOUT[1] and 1 in packed[f]]
         self.packed = packed
         self.target = calibrate_target_period()
@@ -174,8 +176,11 @@ def dataset_choices():
     return out
 
 
-def load_dataset(key):
-    return SocoDataset() if key == "socofing" else FvcDataset(key)
+def load_dataset(key, packed_dir=None):
+    """packed_dir: alternative graph folder (e.g. data/packed_leader), default = Stage 1.5 extractor."""
+    if key == "socofing":
+        return SocoDataset(packed_dir or "data/packed")
+    return FvcDataset(key, packed_dir or "data/fvc_packed")
 
 
 # --------------------------------------------------------------------------- gallery + search

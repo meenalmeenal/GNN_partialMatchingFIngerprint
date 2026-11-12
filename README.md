@@ -153,4 +153,11 @@ additionally need `data/fvc_packed/` and the FVC images (Stage 8).
   Open-set rejection works but the learned score needs z-normalisation. A tuned classical matcher equals the FVC-fine-tuned
   learned model at full area (21.4 %) so the learned advantage on real prints is limited to partial areas. Training-seed
   variance is not yet measured. See `results/stage9c_notes.md`.
-- **Next:** a robust minutiae extractor (MINDTCT / learned) is the highest-value step; then improve the demo.
+- **Stage 9d (robust extractor, GPU) — done; biggest jump of the project.** Replaced the hand-built extractor with the pretrained
+  LEADER detector (`pyfing`; FVC repeatability AUC 0.66 -> 0.90), rebuilt all graphs and retrained on the GPU (torch cu121, 14 s/epoch).
+  Held-out real FVC prints, Rank-1 at 100 % area: classical 17.1 -> 78.8 % (tuned), learned 21.4 -> 76.3 % (SOCOFing-only) and
+  **88.2 %** after FVC fine-tuning (verification EER 36.5 -> 7.4 %); learned still clearly ahead at small areas (10 %: 44.0 vs 30.4 %).
+  SOCOFing (897-finger gallery): learned 88.4 / 85.1 / 75.1 / 60.8 / 44.8 % vs classical 90.3 / 87.2 / 69.1 / 30.9 / 6.1 % at 100/75/50/25/10 %.
+  Caveat: LEADER was trained on three of the FVC databases used here (split reported; gains hold on the unseen ones).
+  See `results/stage9d_notes.md`.
+- **Next:** switch the demo to LEADER + the new models, then Stage 10 (reproducibility) and Stage 11 (final report); training-seed replication.

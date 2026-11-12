@@ -75,11 +75,16 @@ def main():
     ap.add_argument("--fvc-dbs", nargs="*", default=[],
                     help="fine-tune on real FVC impressions from these data/fvc_packed/<db>.pt "
                          "(training fingers 1-40, validation 41-50; fingers 51-100 stay held out)")
+    ap.add_argument("--device", default="cpu", help="cpu | cuda | auto")
+    ap.add_argument("--workers", type=int, default=0, help="DataLoader worker processes (graph augmentation)")
+    ap.add_argument("--fvc-dir", default="data/fvc_packed", help="packed FVC graphs for --fvc-dbs")
     ap.add_argument("--init", default=None, help="warm-start from a Matcher checkpoint "
                     "(same architecture); optimizer and LR schedule restart")
     args = ap.parse_args()
 
-    device = torch.device("cpu")
+    device = torch.device("cuda" if args.device == "auto" and torch.cuda.is_available()
+                          else ("cpu" if args.device == "auto" else args.device))
+    print(f"device: {device}", flush=True)
     torch.manual_seed(args.seed)
     random.seed(args.seed)
     out_dim = args.out_dim or (128 if args.arch == "v1_global" else 64)
@@ -98,7 +103,7 @@ def main():
     if args.fvc_dbs:
         tr_pack, va_pack = {}, {}
         for db in args.fvc_dbs:
-            d = torch.load(os.path.join("data/fvc_packed", db + ".pt"), weights_only=False)
+            d = torch.load(os.path.join(args.fvc_dir, db + ".pt"), weights_only=False)
             for f, imps in d.items():
                 if len(imps) >= 2:
                     if f <= 40:
@@ -121,7 +126,8 @@ def main():
     print(f"arch={args.arch} train fingers={len(train_ds.finger_ids)} val={len(val_ds.finger_ids)} "
           f"(loaded in {time.time() - t0:.0f}s)", flush=True)
 
-    loader = DataLoader(train_ds, batch_size=args.batch_size, collate_fn=triplet_collate)
+    loader = DataLoader(train_ds, batch_size=args.batch_size, collate_fn=triplet_collate,
+                        num_workers=args.workers, persistent_workers=args.workers > 0)
     model = Matcher(args.arch, hidden=args.hidden, out_dim=out_dim, layers=args.layers).to(device)
     if args.init:
         ck = torch.load(args.init, map_location=device, weights_only=False)

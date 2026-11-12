@@ -36,6 +36,7 @@ from partiality_sweep import crop_graph
 LEVELS = [1.0, 0.75, 0.5, 0.25, 0.10]
 CACHE = "data/cache/eval_fixes"
 MODEL = "Stage 9 matcher (trained on SOCOFing only)"
+NOTE = ""
 
 
 def make_queries(ds, fingers, mode, frac, seed):
@@ -125,11 +126,17 @@ def main():
     ap.add_argument("--seeds", type=int, default=3, help="probe/crop seeds for the learned model")
     ap.add_argument("--no-classical", action="store_true")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--packed-dir", default=None, help="graphs from another extractor, e.g. data/packed_leader")
+    ap.add_argument("--checkpoint", default=None, help="Matcher checkpoint (default: Stage 9 inv_local_cont)")
+    ap.add_argument("--cache-tag", default="", help="suffix for the score-matrix cache (needed when the "
+                    "extractor or model differs from the default)")
     args = ap.parse_args()
+    global CACHE
+    CACHE = CACHE + args.cache_tag
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
 
-    ds = D.load_dataset("socofing")
-    gal = D.Gallery(ds, load_matcher(D.model_path(MODEL)))
+    ds = D.load_dataset("socofing", args.packed_dir)
+    gal = D.Gallery(ds, load_matcher(args.checkpoint or D.model_path(MODEL)))
     print(f"{len(gal.fingers)} fingers in gallery", flush=True)
     res = {"gallery": len(gal.fingers), "seeds": args.seeds, "modes": {}}
     for mode in args.modes:
