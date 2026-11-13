@@ -117,6 +117,14 @@ with left:
         c1, c2 = st.columns([3, 2])
         if f"finger_{ds_key}" not in st.session_state:
             st.session_state[f"finger_{ds_key}"] = ds.fingers[7 % len(ds.fingers)]
+
+        def _pick_random_finger(ds=ds, ds_key=ds_key):
+            # runs as the button's on_click callback, i.e. BEFORE widgets are instantiated this run,
+            # so it may still update the selectbox's session_state key (doing it after raises
+            # StreamlitAPIException: cannot be modified after the widget ... is instantiated).
+            st.session_state[f"finger_{ds_key}"] = ds.fingers[int(np.random.randint(len(ds.fingers)))]
+
+        st.button("🎲 Random finger", on_click=_pick_random_finger)
         with c1:
             finger = st.selectbox("Finger", ds.fingers, key=f"finger_{ds_key}", format_func=ds.label)
         keys = ds.query_keys(finger)
@@ -124,9 +132,6 @@ with left:
             qkey = st.selectbox("Probe", keys, key=f"qkey_{ds_key}",
                                 format_func=lambda k: str(k).replace("Altered-", "").replace("_", " ")
                                 if isinstance(k, str) else f"impression {k}")
-        if st.button("🎲 Random finger"):
-            st.session_state[f"finger_{ds_key}"] = ds.fingers[int(np.random.randint(len(ds.fingers)))]
-            st.rerun()
         q_full = ds.graph(finger, qkey)
         q_img = gallery_image(ds_key, finger, qkey)
         true_idx = gal.fingers.index(finger)
