@@ -3,6 +3,9 @@
 Match **partial or damaged fingerprints** against a gallery of full prints with a graph neural network over minutiae graphs,
 and compare it with a classical Hough-alignment minutiae matcher. Research question: how does each degrade as the query print gets smaller?
 
+**New to the project? Start with [`docs/`](docs/README.md)**: [project status](docs/PROJECT_STATUS.md) (what is done, results, limits, what is left),
+[getting started](docs/GETTING_STARTED.md) (install, data, demo, re-running, troubleshooting) and a [glossary](docs/GLOSSARY.md).
+
 **Headline results** (details and caveats in the Status section and `results/stage*_notes.md`):
 
 | | classical (Hough) | learned (GNN + MaxSim) |
@@ -82,7 +85,9 @@ Those stages used the hand-built extractor: `bash scripts/stage1.sh` (data + gra
 `scripts/reproduce.sh check`; re-running them additionally needs `data/graphs`, `data/packed`, `data/fvc_packed`.
 
 ## Status
-🚧 Work in progress.
+10 of 11 stages are done; the final report and presentation (Stage 11) remain. A condensed version of this section with a limits list and a to-do list is in
+[`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md). Stage entries below are chronological in the order the work was done; stages 1-9c quote numbers from the original
+hand-built extractor, which Stage 9d superseded.
 
 - **Stage 1 (data pipeline) — done.** SOCOFing organized into 6,000 finger identities;
   55,270 minutiae graphs built (0 failures); train/val/test split by finger
