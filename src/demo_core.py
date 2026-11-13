@@ -1,5 +1,7 @@
 """
-Back-end of the Stage 7 demo (no Streamlit imports, so it can be tested on its own).
+Back-end of the demo (no Streamlit imports, so it can be tested on its own). Since Stage 9e the
+minutiae come from the pretrained LEADER detector (pyfing) and the models are the ones retrained on
+those graphs (Stage 9d).
 
   dataset  -> where prints, images and minutiae graphs come from (SOCOFing test split or one
               FVC database, held-out fingers only)
@@ -11,22 +13,23 @@ Back-end of the Stage 7 demo (no Streamlit imports, so it can be tested on its o
 Graph coordinates are pixel / 256 in the extractor's own image space (160x160 for SOCOFing,
 the ridge-period-normalised image for FVC), so minutiae are drawn on `dataset.image()`.
 """
+import functools
 import json
 import math
 import os
 import sys
 import time
 
+os.environ.setdefault("KERAS_BACKEND", "torch")        # pyfing/Keras 3 on the PyTorch backend (no TensorFlow)
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import cv2
 import numpy as np
 import torch
 
-import minutiae as M
 from augment import GRAPH_NORM, build_graph_fast
 from classical_match import graph_to_minutiae, hough_score
-from fvc_pipeline import calibrate_target_period, minutiae_from_gray, minutiae_to_data
+from fvc_pipeline import calibrate_target_period
 from model_v2 import encode_graphs, load_matcher, sim_matrix
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
@@ -34,13 +37,34 @@ FVC_ROOT = os.path.join(ROOT, "data", "FVC", "74034_3_En_4_MOESM1_ESM")
 GALLERY_TAG = "Real_real"
 FVC_HELDOUT = (51, 100)      # fingers never used for fine-tuning or model selection (Stage 8)
 MIN_MINUTIAE = 3
+SOCO_SIZE = 160
 
+SOCO_MODEL = "Matcher trained on SOCOFing (LEADER minutiae)"
+FVC_MODEL = "Matcher fine-tuned on real FVC prints (LEADER minutiae)"
 MODEL_FILES = {
-    "Stage 9 matcher (trained on SOCOFing only)": ["models/stage9_inv_local_cont.pt",
-                                                  "results/stage9_inv_local_cont/best_model.pt"],
-    "Stage 8 matcher, fine-tuned on real FVC prints": ["models/stage8_inv_local_fvcft.pt",
-                                                      "results/stage8_inv_local_fvcft/best_model.pt"],
+    SOCO_MODEL: ["models/stage9d_leader_inv_local.pt", "results/stage9d_leader_inv_local/best_model.pt"],
+    FVC_MODEL: ["models/stage9d_leader_fvcft.pt", "results/stage9d_leader_fvcft/best_model.pt"],
 }
+TUNED_CLASSICAL = "results/stage9d/classical_tuned_leader.json"   # Hough tolerances tuned on FVC set B
+
+
+def tuned_classical_params():
+    p = os.path.join(ROOT, TUNED_CLASSICAL)
+    return json.load(open(p))["tuned"]["params"] if os.path.exists(p) else None
+
+
+_LEADER = {}
+
+
+def leader_graph(gray, cap):
+    """Image (already at the extractor's working scale) -> (graph or None) with the LEADER detector."""
+    from leader_pipeline import get_leader, to_graph
+    if "alg" not in _LEADER:
+        _LEADER["alg"] = get_leader()
+    with torch.no_grad():
+        # run_on_db (Keras predict) also works on the GPU; the single-image run() calls .numpy() on a CUDA tensor
+        mins = _LEADER["alg"].run_on_db([gray], batch_size=1)[0]
+    return to_graph(mins, cap)
 
 
 def model_path(label):
@@ -67,11 +91,11 @@ class SocoDataset:
     """SOCOFing test split (900 held-out fingers). Gallery = the clean `Real` print, queries =
     its synthetically altered versions (CR / Obl / Zcut, Easy / Medium / Hard)."""
     key = "socofing"
-    title = "SOCOFing - synthetic alterations (900 held-out fingers)"
+    title = "SOCOFing - synthetic alterations (held-out test fingers)"
     real = False
     gallery_key = GALLERY_TAG
 
-    def __init__(self, packed_dir="data/packed"):
+    def __init__(self, packed_dir="data/packed_leader"):
         self.packed = torch.load(os.path.join(ROOT, packed_dir, "test.pt"), weights_only=False)
         # a finger needs a gallery print and at least one altered probe (graphs from a stricter extractor
         # can be missing for badly damaged prints)
@@ -89,19 +113,12 @@ class SocoDataset:
     def image(self, f, key):
         p = os.path.join(ROOT, "data", "SOCOFing_organized", str(f), key + ".BMP")
         img = cv2.imread(p, cv2.IMREAD_GRAYSCALE)
-        return None if img is None else cv2.resize(img, (M.EXTRACT_CFG["size"],) * 2,
-                                                   interpolation=cv2.INTER_CUBIC)
+        return None if img is None else cv2.resize(img, (SOCO_SIZE,) * 2, interpolation=cv2.INTER_CUBIC)
 
     def extract(self, gray):
-        """Uploaded image -> (graph, display image) with the exact SOCOFing recipe."""
-        M.EXTRACT_CFG["max_minutiae"] = 100
-        s = M.EXTRACT_CFG["size"]
-        shown = cv2.resize(gray, (s, s), interpolation=cv2.INTER_CUBIC)
-        img = cv2.equalizeHist(shown)
-        mask = M.segment_mask(img)
-        skel = M.binarize_and_skeletonize(M.gabor_enhance(img, M.orientation_field(img))) * mask
-        skel = M.prune_spurs(M._drop_specks(skel))
-        return minutiae_to_data(M.extract_minutiae(skel, mask=mask)), shown
+        """Uploaded image -> (graph, display image) with the SOCOFing recipe (160x160, LEADER)."""
+        shown = cv2.resize(gray, (SOCO_SIZE,) * 2, interpolation=cv2.INTER_CUBIC)
+        return leader_graph(shown, 100), shown
 
 
 def fvc_scales(target):
@@ -130,7 +147,7 @@ class FvcDataset:
     real = True
     gallery_key = 1
 
-    def __init__(self, name, packed_dir="data/fvc_packed"):
+    def __init__(self, name, packed_dir="data/fvc_packed_leader"):
         self.key = name                                     # e.g. fvc2002_db1
         y, db = int(name[3:7]), int(name[-1])
         self.dir = os.path.join(FVC_ROOT, f"FVC{y}", "Dbs", f"Db{db}_a")
@@ -155,14 +172,13 @@ class FvcDataset:
         img = cv2.imread(os.path.join(self.dir, f"{f}_{key}.tif"), cv2.IMREAD_GRAYSCALE)
         if img is None:
             return None
-        img = cv2.resize(img, None, fx=self.scale, fy=self.scale, interpolation=cv2.INTER_CUBIC)
-        return cv2.equalizeHist(img)
+        return cv2.resize(img, None, fx=self.scale, fy=self.scale, interpolation=cv2.INTER_CUBIC)
 
     def extract(self, gray):
-        """Uploaded image -> (graph, display image); assumes the same sensor as this database."""
-        M.EXTRACT_CFG["max_minutiae"] = 200
-        mins, _, _, img, _ = minutiae_from_gray(gray, self.target, self.scale)
-        return minutiae_to_data(mins), img
+        """Uploaded image -> (graph, display image); assumes the same sensor as this database
+        (rescaled by its fixed ridge-period factor, then LEADER)."""
+        img = cv2.resize(gray, None, fx=self.scale, fy=self.scale, interpolation=cv2.INTER_CUBIC)
+        return leader_graph(img, 200), img
 
 
 def dataset_choices():
@@ -177,18 +193,19 @@ def dataset_choices():
 
 
 def load_dataset(key, packed_dir=None):
-    """packed_dir: alternative graph folder (e.g. data/packed_leader), default = Stage 1.5 extractor."""
-    if key == "socofing":
-        return SocoDataset(packed_dir or "data/packed")
-    return FvcDataset(key, packed_dir or "data/fvc_packed")
+    """packed_dir: graph folder; default = the LEADER graphs (Stage 9d). Pass data/packed or
+    data/fvc_packed for the original Stage 1.5 extractor."""
+    cls, args = (SocoDataset, ()) if key == "socofing" else (FvcDataset, (key,))
+    return cls(*args, packed_dir) if packed_dir else cls(*args)
 
 
 # --------------------------------------------------------------------------- gallery + search
 class Gallery:
     """Enrolled templates of a dataset, encoded once by one model."""
 
-    def __init__(self, ds, model):
+    def __init__(self, ds, model, classical_params=None):
         self.ds, self.model = ds, model
+        self.hough = functools.partial(hough_score, **classical_params) if classical_params else hough_score
         self.fingers = list(ds.fingers)
         self.graphs = [ds.graph(f, ds.gallery_key) for f in self.fingers]
         self.mins = [graph_to_minutiae(g) for g in self.graphs]
@@ -205,7 +222,7 @@ class Gallery:
 
     def search_classical(self, q_graph):
         qm = graph_to_minutiae(q_graph)
-        return np.array([hough_score(qm, g) for g in self.mins], dtype=np.float32)
+        return np.array([self.hough(qm, g) for g in self.mins], dtype=np.float32)
 
 
 def rank_of(scores, idx):
@@ -293,3 +310,23 @@ def draw_correspondence(fig, q_img, q_graph, g_img, g_graph, q_desc, g_desc, top
         fig.add_artist(ConnectionPatch((qx[i], qy[i]), (gx[arg[i]], gy[arg[i]]), "data", "data",
                                        axesA=ax1, axesB=ax2, color=c, lw=1.3, alpha=0.9))
     return float(best.mean())
+
+
+# --------------------------------------------------------------------------- "is it enrolled at all?"
+REJECT_FILE = "results/stage9e/reject_thresholds.json"
+
+
+def reject_thresholds(ds_key, area_pct):
+    """z-score thresholds (and the matching identification rates) at the print area `area_pct`, from
+    calibrate_reject.py; linear interpolation between the calibrated areas. None if not calibrated."""
+    p = os.path.join(ROOT, REJECT_FILE)
+    if not os.path.exists(p):
+        return None
+    tab = json.load(open(p)).get(ds_key)
+    if not tab:
+        return None
+    xs = sorted(int(a) for a in tab)
+    out = {}
+    for k in ("z_far10", "z_far1", "dir_far10", "dir_far1"):
+        out[k] = float(np.interp(area_pct, xs, [tab[str(a)][k] for a in xs]))
+    return out

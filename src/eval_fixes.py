@@ -35,7 +35,7 @@ from partiality_sweep import crop_graph
 
 LEVELS = [1.0, 0.75, 0.5, 0.25, 0.10]
 CACHE = "data/cache/eval_fixes"
-MODEL = "Stage 9 matcher (trained on SOCOFing only)"
+MODEL = "models/stage9_inv_local_cont.pt"        # Stage 9c default (old-extractor model); pass --checkpoint for others
 NOTE = ""
 
 
@@ -135,8 +135,8 @@ def main():
     CACHE = CACHE + args.cache_tag
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
 
-    ds = D.load_dataset("socofing", args.packed_dir)
-    gal = D.Gallery(ds, load_matcher(args.checkpoint or D.model_path(MODEL)))
+    ds = D.load_dataset("socofing", args.packed_dir or "data/packed")
+    gal = D.Gallery(ds, load_matcher(args.checkpoint or MODEL))
     print(f"{len(gal.fingers)} fingers in gallery", flush=True)
     res = {"gallery": len(gal.fingers), "seeds": args.seeds, "modes": {}}
     for mode in args.modes:

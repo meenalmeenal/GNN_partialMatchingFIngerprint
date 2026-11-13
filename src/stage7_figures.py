@@ -15,10 +15,10 @@ import numpy as np
 import demo_core as D
 from model_v2 import load_matcher
 
-SETTINGS = [("socofing", "Stage 9 matcher (trained on SOCOFing only)", 0.5),
-            ("socofing", "Stage 9 matcher (trained on SOCOFing only)", 0.25),
-            ("fvc2002_db2", "Stage 8 matcher, fine-tuned on real FVC prints", 1.0),
-            ("fvc2002_db2", "Stage 8 matcher, fine-tuned on real FVC prints", 0.5)]
+SETTINGS = [("socofing", D.SOCO_MODEL, 0.5),
+            ("socofing", D.SOCO_MODEL, 0.25),
+            ("fvc2002_db2", D.FVC_MODEL, 1.0),
+            ("fvc2002_db2", D.FVC_MODEL, 0.5)]
 K = 4
 rng = random.Random(7)
 fig, axes = plt.subplots(len(SETTINGS), K + 1, figsize=(2.4 * (K + 1), 2.5 * len(SETTINGS)))
@@ -51,5 +51,5 @@ for r, (dk, ml, area) in enumerate(SETTINGS):
     axes[r, 0].set_ylabel(("SOCOFing" if dk == "socofing" else dk.upper()), fontsize=9)
     print(f"{dk} {int(area * 100)}%: true rank {D.rank_of(s, ti)} of {len(gal.fingers)}")
 fig.tight_layout()
-os.makedirs("results/stage7", exist_ok=True)
-fig.savefig("results/stage7/examples.png", dpi=110)
+os.makedirs("results/stage9e", exist_ok=True)
+fig.savefig("results/stage9e/examples.png", dpi=110)

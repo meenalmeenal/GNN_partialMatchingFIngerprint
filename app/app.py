@@ -1,5 +1,5 @@
 """
-Stage 7 demo: give the system a partial fingerprint, get the closest enrolled prints back.
+Demo (Stage 7, minutiae + models upgraded in Stage 9e): give the system a partial fingerprint, get the closest enrolled prints back.
 
     streamlit run app/app.py          (from the repository root)
 
@@ -51,7 +51,8 @@ def get_model(label):
 
 @st.cache_resource(show_spinner="Encoding the gallery ...")
 def get_gallery(ds_key, model_label):
-    return D.Gallery(get_dataset(ds_key), get_model(model_label))
+    ds = get_dataset(ds_key)
+    return D.Gallery(ds, get_model(model_label), D.tuned_classical_params() if ds.real else None)
 
 
 @st.cache_data(show_spinner=False, max_entries=512)
@@ -71,8 +72,8 @@ with st.sidebar:
     ds_key = st.selectbox("Gallery / dataset", list(choices), format_func=choices.get,
                           help="The enrolled full prints that the query is searched against.")
     real = ds_key != "socofing"
-    default_model = models.index("Stage 8 matcher, fine-tuned on real FVC prints") if (
-        real and "Stage 8 matcher, fine-tuned on real FVC prints" in models) else 0
+    want = D.FVC_MODEL if real else D.SOCO_MODEL
+    default_model = models.index(want) if want in models else 0
     model_label = st.selectbox("Learned model", models, index=default_model, key=f"model_{real}")
     source = st.radio("Query print", ["Sample from the dataset", "Upload an image"], key="source")
 
@@ -89,12 +90,15 @@ with st.sidebar:
 
     st.divider()
     if real:
-        st.warning("**Real prints are hard for this system.** On held-out FVC fingers the best "
-                   "model reaches ~21 % Rank-1 (classical 17 %; chance 2 %). The weak step is "
-                   "minutiae extraction on independent impressions, not the matcher (Stage 8).")
+        st.warning("**Real, independent impressions.** On held-out FVC fingers (50-print galleries, full prints) "
+                   "the fine-tuned model reaches ~88 % Rank-1 (classical, tuned: 79 %; chance 2 %). Caveats: "
+                   "it was fine-tuned on other fingers of the same sensors, and the minutiae detector (LEADER) "
+                   "was itself trained on three of these databases (2002 DB3, 2004 DB1, DB3); on the others "
+                   "the fine-tuned model reaches ~84 %.")
     else:
-        st.info("SOCOFing queries are *edited copies* of the enrolled print, so this is the "
-                "optimistic setting (Stage 9). Real, independent impressions: choose an FVC gallery.")
+        st.info("SOCOFing queries are *edited copies* of the enrolled print, which makes this the optimistic "
+                "setting: Rank-1 about 88 % on full prints, 75 % at half the print, 45 % at 10 % "
+                "(897-print gallery). For independent impressions choose an FVC gallery.")
 
 ds = get_dataset(ds_key)
 gal = get_gallery(ds_key, model_label)
@@ -131,8 +135,8 @@ with left:
                               type=["png", "jpg", "jpeg", "bmp", "tif", "tiff"])
         if up is None:
             st.info("Upload a fingerprint image, or switch to *Sample from the dataset*. The image is "
-                    + ("resized to 160 x 160 and processed exactly like SOCOFing." if not real else
-                       "rescaled with this database's ridge-spacing factor (assumes the same sensor).")
+                    + ("resized to 160 x 160 and passed through the LEADER minutiae detector, like SOCOFing." if not real else
+                       "rescaled with this database's ridge-spacing factor, then LEADER (assumes the same sensor).")
                     )
             st.stop()
         gray = cv2.imdecode(np.frombuffer(up.read(), np.uint8), cv2.IMREAD_GRAYSCALE)
@@ -210,10 +214,26 @@ with right:
     m3.metric("Search time", f"{(t_l + t_c) * 1000:.0f} ms",
               help=f"learned {t_l * 1000:.0f} ms" + (f", classical {t_c * 1000:.0f} ms" if s_c is not None else ""))
 
+    th = D.reject_thresholds(ds_key, area)
+    if th is not None:
+        zt = float(z_l[order_l[0]])
+        if zt >= th["z_far1"]:
+            st.success(f"**Likely enrolled.** Top match z = {zt:+.1f} is above the strict threshold "
+                       f"({th['z_far1']:+.1f}): about 1 in 100 prints that are *not* enrolled would score this high.")
+        elif zt >= th["z_far10"]:
+            st.warning(f"**Uncertain.** Top match z = {zt:+.1f} is between the lenient ({th['z_far10']:+.1f}, "
+                       f"10 % of unknown prints pass) and strict ({th['z_far1']:+.1f}, 1 % pass) thresholds.")
+        else:
+            st.error(f"**Probably not enrolled.** Top match z = {zt:+.1f} is below {th['z_far10']:+.1f}, a level "
+                     "that 90 % of prints not in the gallery stay under.")
+        st.caption(f"Reject thresholds calibrated at {area} % print area with half of the fingers enrolled and the "
+                   f"rest unknown; at these thresholds enrolled prints are correctly identified and accepted "
+                   f"{th['dir_far10'] * 100:.0f} % (lenient) / {th['dir_far1'] * 100:.0f} % (strict) of the time.")
+
     st.markdown("**Learned matcher** (relative-geometry GNN, MaxSim over minutia descriptors)")
     result_cards(order_l, s_l, z_l, topk)
     if s_c is not None:
-        st.markdown("**Classical matcher** (Hough alignment, no training)")
+        st.markdown("**Classical matcher** (Hough alignment, no training" + (", tolerances tuned on FVC set B" if ds.real else "") + ")")
         result_cards(order_c, s_c, z_c, topk)
 
 # ----------------------------------------------------------------------------- explanation
@@ -256,23 +276,23 @@ with ex_r:
                "far to the right of the crowd; a guess does not.")
 
 with st.expander("How it works, and what to trust"):
-    st.markdown(f"""
-**Pipeline.** fingerprint image → minutiae (ridge endings / bifurcations, classical extractor) → graph
-(minutiae = nodes, 5 nearest neighbours = edges) → graph neural network that sees only *relative* geometry
-(distances and angles between neighbouring minutiae, so rotation and shift do not matter) → one descriptor
-per minutia → the score of a query against a template is the mean, over query minutiae, of the best
-cosine similarity to any template minutia. Because it is a mean over the *query's* minutiae, a partial
-query is judged only on what it contains - this is what lets it degrade gracefully when the print shrinks.
+    st.markdown("""
+**Pipeline.** fingerprint image → minutiae (ridge endings / bifurcations) found by LEADER, a pretrained neural
+detector (pyfing) → graph (minutiae = nodes, 5 nearest neighbours = edges) → graph neural network that sees only
+*relative* geometry (distances and angles between neighbouring minutiae, so rotation and shift do not matter) →
+one descriptor per minutia → the score of a query against a template is the mean, over query minutiae, of the best
+cosine similarity to any template minutia. Because it is a mean over the *query's* minutiae, a partial query is
+judged only on what it contains - this is what lets it degrade gracefully when the print shrinks.
 
 **Honest limits.**
-- Trained on SOCOFing, where queries are edited copies of the enrolled print. On the held-out 900-finger
-  test set the full protocol gives Rank-1 73 % (Stage 9). With a 900-print gallery and half the print, expect
-  a hit rate far below the 200-finger numbers reported in `results/stage9_notes.md`.
-- On real, independent impressions (FVC) every system here, including the classical baseline, is weak:
-  best Rank-1 21 % on 50 held-out fingers (chance 2 %), verification EER 36-47 % (competent systems: below 5 %).
-  The cause is mostly unrepeatable minutiae extraction, which a better extractor (next step) should address.
-- Uploaded images are only handled well if they look like the training data (SOCOFing-style prints, or
-  an FVC-like sensor with the database selected above). Phone photos or latent prints will not work yet.
-- The partial prints here are square windows cut from the full print's minutiae; real latent prints are
-  irregular, smudged and rarely this clean.
+- SOCOFing queries are edited copies of the enrolled print. Full protocol on the 897-finger test gallery (windows
+  centred on a minutia): Rank-1 88 / 85 / 75 / 61 / 45 % at 100 / 75 / 50 / 25 / 10 % of the print (classical:
+  90 / 87 / 69 / 31 / 6 %). Windows placed uniformly at random (the sliders here) are harsher: expect less.
+- On real FVC impressions the fine-tuned model reaches about 88 % Rank-1 against 50 enrolled fingers per database
+  (44 % with 10 % of the print). The detector was trained on part of FVC, and the matcher fine-tuned on other
+  fingers of the same sensors, so this does not show generalisation to new sensors.
+- Uploaded images only work if they look like the training data (SOCOFing-style prints, or the sensor of the
+  selected FVC database). Phone photos or latent prints are not supported.
+- The partial prints are square windows over the extracted minutiae; real latent prints are irregular, smudged
+  and rarely this clean. The "enrolled?" verdict is calibrated on these same benchmark conditions.
 """)

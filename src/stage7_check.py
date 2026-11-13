@@ -6,7 +6,7 @@ cut from one probe, searched against the WHOLE gallery) for the learned and clas
   FVC      : gallery = the 50 held-out fingers (51-100) of each database; one random impression
              2-8 per finger (fine-tuned model)
 
-    python src/stage7_check.py --n-socofing 300 --out results/stage7/demo_numbers.json
+    python src/stage7_check.py --n-socofing 300 --out results/stage9e/demo_numbers.json
 """
 import argparse
 import json
@@ -22,12 +22,11 @@ import demo_core as D
 from model_v2 import load_matcher
 
 AREAS = [1.0, 0.5, 0.25]
-SOCO_MODEL = "Stage 9 matcher (trained on SOCOFing only)"
-FVC_MODEL = "Stage 8 matcher, fine-tuned on real FVC prints"
+SOCO_MODEL, FVC_MODEL = D.SOCO_MODEL, D.FVC_MODEL
 
 
 def run(ds, model, n, seed):
-    gal = D.Gallery(ds, model)
+    gal = D.Gallery(ds, model, D.tuned_classical_params() if ds.real else None)
     rng = random.Random(seed)
     fingers = rng.sample(gal.fingers, min(n, len(gal.fingers))) if n else list(gal.fingers)
     out = {}
@@ -56,7 +55,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--n-socofing", type=int, default=300)
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--out", default="results/stage7/demo_numbers.json")
+    ap.add_argument("--out", default="results/stage9e/demo_numbers.json")
     args = ap.parse_args()
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     res = {}

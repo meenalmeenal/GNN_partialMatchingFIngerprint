@@ -160,4 +160,8 @@ additionally need `data/fvc_packed/` and the FVC images (Stage 8).
   SOCOFing (897-finger gallery): learned 88.4 / 85.1 / 75.1 / 60.8 / 44.8 % vs classical 90.3 / 87.2 / 69.1 / 30.9 / 6.1 % at 100/75/50/25/10 %.
   Caveat: LEADER was trained on three of the FVC databases used here (split reported; gains hold on the unseen ones).
   See `results/stage9d_notes.md`.
-- **Next:** switch the demo to LEADER + the new models, then Stage 10 (reproducibility) and Stage 11 (final report); training-seed replication.
+- **Stage 9e (demo on the best pipeline) — done.** The Streamlit demo now uses LEADER minutiae and the Stage 9d models, compares against the
+  FVC-tuned classical matcher, and shows an open-set verdict ("likely enrolled / uncertain / probably not enrolled") from calibrated z-score thresholds.
+  Demo-protocol Rank-1 (random window): FVC 87 / 84 / 73 % at 100/50/25 % area (classical 75 / 75 / 68); SOCOFing 89 / 39 / 24 % (classical 90 / 38 / 13).
+  See `results/stage9e_notes.md`.
+- **Next:** Stage 10 (reproducibility) and Stage 11 (final report); training-seed replication on the final model.
